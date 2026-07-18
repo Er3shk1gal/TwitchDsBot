@@ -24,9 +24,21 @@ public sealed class YouTubeNotificationSource : INotificationSource
     public YouTubeNotificationSource(IOptions<YouTubeOptions> options, ILogger<YouTubeNotificationSource> logger)
     {
         _logger = logger;
+
+        // Strip whitespace and surrounding quotes: docker-compose env_file passes values literally,
+        // so a .env line like YOUTUBE__APIKEY="AIza..." would otherwise send the quotes to Google and
+        // fail with "API key not valid".
+        var apiKey = (options.Value.ApiKey ?? string.Empty).Trim().Trim('"', '\'');
+        if (apiKey.Length != 39 || !apiKey.StartsWith("AIza", StringComparison.Ordinal))
+        {
+            _logger.LogWarning(
+                "YouTube API key looks off (length {Length}; a valid key is 39 chars starting with 'AIza'). " +
+                "Notifier requests will fail until it's corrected.", apiKey.Length);
+        }
+
         _yt = new YouTubeService(new BaseClientService.Initializer
         {
-            ApiKey = options.Value.ApiKey,
+            ApiKey = apiKey,
             ApplicationName = "DiscordBot.YouTubeNotifier",
         });
     }
