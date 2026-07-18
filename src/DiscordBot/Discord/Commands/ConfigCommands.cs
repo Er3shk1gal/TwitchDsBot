@@ -110,6 +110,63 @@ public sealed class ConfigCommands
         await ctx.RespondAsync($"Славно! Предложения товарищей отныне падают в {channel.Mention}!", ephemeral: true);
     }
 
+    [Command("autorole")]
+    [Description("Роль, выдаваемая всем при входе (без роли — выключить).")]
+    public async ValueTask AutoRoleAsync(
+        SlashCommandContext ctx,
+        [Description("Роль для новых участников.")] DiscordRole? role = null)
+    {
+        await UpdateAsync(ctx.Guild!.Id, c => c.AutoRoleId = role?.Id);
+        await ctx.RespondAsync(role is null
+            ? "Отныне новобранцы вступают в ряды без роли."
+            : $"Славно! Каждый новый товарищ получит {role.Mention} при входе в наши ряды!", ephemeral: true);
+    }
+
+    [Command("autorolesync")]
+    [Description("Пожаловать авто-роль всем нынешним участникам.")]
+    public async ValueTask AutoRoleSyncAsync(SlashCommandContext ctx)
+    {
+        ulong? roleId;
+        await using (var scope = _scopeFactory.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+            roleId = await db.GuildConfigs.AsNoTracking()
+                .Where(c => c.GuildId == ctx.Guild!.Id)
+                .Select(c => c.AutoRoleId)
+                .FirstOrDefaultAsync();
+        }
+
+        if (roleId is null)
+        {
+            await ctx.RespondAsync("Сперва назначь авто-роль через `/config autorole`, друг мой!", ephemeral: true);
+            return;
+        }
+
+        var role = ctx.Guild!.Roles.GetValueOrDefault(roleId.Value);
+        if (role is null)
+        {
+            await ctx.RespondAsync("Не сыскал сей роли — быть может, её упразднили?", ephemeral: true);
+            return;
+        }
+
+        await ctx.DeferResponseAsync(ephemeral: true);
+
+        int granted = 0, failed = 0;
+        await foreach (var member in ctx.Guild.GetAllMembersAsync())
+        {
+            if (member.IsBot || member.Roles.Any(r => r.Id == role.Id))
+            {
+                continue;
+            }
+            try { await member.GrantRoleAsync(role, "autorole sync"); granted++; }
+            catch { failed++; }
+        }
+
+        await ctx.EditResponseAsync(
+            $"Готово! Роль {role.Mention} пожалована **{granted}** товарищам" +
+            (failed > 0 ? $" (не вышло у {failed} — проверь мои права и старшинство роли)." : "."));
+    }
+
     [Command("show")]
     [Description("Показать нынешние настройки нашего квеста.")]
     public async ValueTask ShowAsync(SlashCommandContext ctx)
@@ -131,6 +188,7 @@ public sealed class ConfigCommands
             .AddField("Шаблон имени", $"`{config.TempNameTemplate}`", inline: false)
             .AddField("Роль барда", config.DjRoleId is { } dj ? $"<@&{dj}>" : "_каждый товарищ_", inline: true)
             .AddField("Зал предложений", config.SuggestionsChannelId is { } sug ? $"<#{sug}>" : "_не задан_", inline: true)
+            .AddField("Авто-роль при входе", config.AutoRoleId is { } ar ? $"<@&{ar}>" : "_нет_", inline: true)
             .Build();
 
         await ctx.RespondAsync(embed);

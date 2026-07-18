@@ -31,6 +31,9 @@ public sealed class GuildConfig
 
     /// <summary>Text channel where user /suggest submissions are posted. Null = not configured.</summary>
     public ulong? SuggestionsChannelId { get; set; }
+
+    /// <summary>Role auto-granted to every member on join. Null = disabled.</summary>
+    public ulong? AutoRoleId { get; set; }
 }
 
 /// <summary>A live, bot-created temporary voice channel and who owns it.</summary>

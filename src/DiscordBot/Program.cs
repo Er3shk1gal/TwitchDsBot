@@ -60,7 +60,10 @@ if (!string.IsNullOrWhiteSpace(youTubeOptions.ApiKey))
 }
 
 // --- Discord client (integrated with the generic host's service collection) ---
-var intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildVoiceStates;
+// GuildMembers is a PRIVILEGED intent (needed for auto-role on join) — it must be enabled in the
+// Discord Developer Portal (Bot → Privileged Gateway Intents → Server Members Intent) or the bot
+// will fail to connect.
+var intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildVoiceStates | DiscordIntents.GuildMembers;
 
 DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Services)
     .UseCommands(
@@ -80,7 +83,9 @@ DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Servic
             DebugGuildId = discordOptions.DebugGuildId ?? 0,
         })
     .UseVoiceNext(new VoiceNextConfiguration())
-    .ConfigureEventHandlers(events => events.AddEventHandlers<VoiceStateHandler>());
+    .ConfigureEventHandlers(events => events
+        .AddEventHandlers<VoiceStateHandler>()
+        .AddEventHandlers<MemberJoinHandler>());
 
 // --- Hosted services (order matters: connect Discord before the notifier polls) ---
 builder.Services.AddHostedService<DiscordStartupService>();
@@ -101,6 +106,7 @@ using (var scope = host.Services.CreateScope())
     [
         ("Subscriptions", "PrimedAt", "TEXT"),
         ("GuildConfigs", "SuggestionsChannelId", "INTEGER"),
+        ("GuildConfigs", "AutoRoleId", "INTEGER"),
     ];
     foreach (var (table, column, type) in addedColumns)
     {
