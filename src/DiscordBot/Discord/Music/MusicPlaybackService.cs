@@ -65,20 +65,7 @@ public sealed class MusicPlaybackService
                 return existing;
             }
 
-            // ConnectAsync has no built-in timeout. If the voice UDP/gateway handshake never
-            // completes (common with restrictive Docker/NAT networking) it would hang forever while
-            // holding _connectLock, freezing ALL music commands. Bound it so we fail cleanly instead.
-            var connection = _voiceNext.GetConnection(guild);
-            if (connection is null)
-            {
-                var connectTask = _voiceNext.ConnectAsync(voiceChannel);
-                var finished = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(20)));
-                if (finished != connectTask)
-                {
-                    throw new TimeoutException("Voice connection timed out — the voice gateway/UDP may be unreachable.");
-                }
-                connection = await connectTask; // observe the result / surface the real error
-            }
+            var connection = await ConnectWithFallbackAsync(guild, voiceChannel);
 
             var player = new GuildMusicPlayer(
                 guild.Id,
@@ -101,6 +88,67 @@ public sealed class MusicPlaybackService
             _connectLock.Release();
         }
     }
+
+    /// <summary>
+    /// Connect to a voice channel, tolerating a DSharpPlus 5 nightly quirk where VoiceNext's
+    /// ConnectAsync task stays pending even though the bot has actually joined the channel. We poll
+    /// GetConnection and use the live connection the moment it registers, instead of waiting on the
+    /// (possibly hanging) task.
+    /// </summary>
+    private async Task<VoiceNextConnection> ConnectWithFallbackAsync(DiscordGuild guild, DiscordChannel voiceChannel)
+    {
+        var existing = _voiceNext.GetConnection(guild);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        Task<VoiceNextConnection> connectTask;
+        try
+        {
+            connectTask = _voiceNext.ConnectAsync(voiceChannel);
+        }
+        catch
+        {
+            // e.g. "already connected in this guild" — use whatever is registered.
+            var registered = _voiceNext.GetConnection(guild);
+            if (registered is not null)
+            {
+                return registered;
+            }
+            throw;
+        }
+
+        // Poll for up to ~30s: whichever comes first — the task finishing or the connection appearing.
+        for (var i = 0; i < 120; i++)
+        {
+            await Task.WhenAny(connectTask, Task.Delay(250));
+
+            var live = _voiceNext.GetConnection(guild);
+            if (live is not null)
+            {
+                ObserveFaults(connectTask);
+                return live;
+            }
+
+            if (connectTask.IsCompleted)
+            {
+                break;
+            }
+        }
+
+        if (connectTask.IsCompletedSuccessfully)
+        {
+            return connectTask.Result;
+        }
+
+        ObserveFaults(connectTask);
+        throw new TimeoutException("Voice connection didn't establish in time (voice gateway/UDP unreachable?).");
+    }
+
+    // Swallow a possibly-still-pending connect task's eventual fault so it isn't an unobserved exception.
+    private static void ObserveFaults(Task task) =>
+        _ = task.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
 
     /// <summary>Stop playback, disconnect and dispose the guild's player.</summary>
     public async Task DisconnectAsync(ulong guildId)
