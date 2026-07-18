@@ -29,8 +29,9 @@ services:
 
     volumes:
       - bot-data:/app/data
-      # Put a Netscape cookies.txt next to this file and uncomment to enable YouTube cookies:
-      # - ./cookies.txt:/app/cookies.txt:ro
+      # Put a Netscape cookies.txt next to this file and uncomment to enable YouTube cookies.
+      # NOT read-only: yt-dlp writes refreshed cookies back, which keeps them working longer.
+      # - ./cookies.txt:/app/cookies.txt
 
     # Outbound-only bot: no ports to expose.
     logging:
