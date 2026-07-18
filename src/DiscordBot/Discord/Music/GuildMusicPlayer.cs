@@ -17,7 +17,7 @@ public sealed class GuildMusicPlayer : IAsyncDisposable
 {
     // 20ms of 48kHz 16-bit stereo PCM — the frame size VoiceNext expects.
     private const int FrameSize = 3840;
-    private static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(30);
 
     private readonly ulong _guildId;
     private readonly VoiceNextConnection _connection;

@@ -48,7 +48,7 @@ public sealed class MusicCommands
         ResolvedTrack? track;
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             track = await _music.Resolver.ResolveAsync(query, ctx.User.Id, timeout.Token);
         }
         catch (Exception)

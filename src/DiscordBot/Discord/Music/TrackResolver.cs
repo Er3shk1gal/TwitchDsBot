@@ -84,6 +84,18 @@ public sealed class TrackResolver
         psi.ArgumentList.Add(searchPrefix ?? _options.DefaultSearchPrefix); // e.g. "ytsearch"
         psi.ArgumentList.Add("--no-warnings");
 
+        // Fail fast instead of hanging: bound socket reads, cap retries, and force IPv4 (IPv6 in
+        // containers frequently stalls on connect). The outer CancellationToken still kills the
+        // process as a hard backstop, but these keep a slow/blocked source from feeling frozen.
+        psi.ArgumentList.Add("--socket-timeout");
+        psi.ArgumentList.Add("15");
+        psi.ArgumentList.Add("--retries");
+        psi.ArgumentList.Add("3");
+        psi.ArgumentList.Add("--extractor-retries");
+        psi.ArgumentList.Add("1");
+        psi.ArgumentList.Add("--no-cache-dir");
+        psi.ArgumentList.Add("-4");
+
         // One --print per field => newline-delimited, unambiguous even for titles with odd chars.
         // %(url)s on a format-selected item is the direct media stream URL.
         foreach (var field in PrintFields)
