@@ -52,7 +52,7 @@ public sealed class NotifyCommands
         var source = _sources.FirstOrDefault(s => s.SourceType == ContentSourceType.YouTube);
         if (source is null)
         {
-            await ctx.RespondAsync("Увы, дорогой оруженосец, герольды YouTube почивают и не могут выступить в поход (быть может, утерян ключ API?).", ephemeral: true);
+            await ctx.RespondAsync("Увы, дорогой Санчо, герольды YouTube почивают и не могут выступить в поход (быть может, утерян ключ API?).", ephemeral: true);
             return;
         }
 

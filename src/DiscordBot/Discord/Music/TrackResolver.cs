@@ -30,15 +30,39 @@ public sealed class TrackResolver
     public async Task<ResolvedTrack?> ResolveAsync(string query, ulong requestedBy, CancellationToken ct)
     {
         var results = await ResolveManyAsync(query, requestedBy, playlist: false, ct);
-        return results.Count > 0 ? results[0] : null;
+        if (results.Count > 0)
+        {
+            return results[0];
+        }
+
+        // For plain search queries (not URLs), retry once with the alternate provider: if the default
+        // is YouTube and it found nothing, try SoundCloud, and vice versa. This also rescues searches
+        // that only hit a DRM-protected SoundCloud track by falling through to YouTube.
+        if (!LooksLikeUrl(query))
+        {
+            var alternate = _options.DefaultSearchPrefix.StartsWith("yt", StringComparison.OrdinalIgnoreCase)
+                ? "scsearch"
+                : "ytsearch";
+            var fallback = await ResolveManyAsync(query, requestedBy, playlist: false, ct, searchPrefix: alternate);
+            if (fallback.Count > 0)
+            {
+                return fallback[0];
+            }
+        }
+
+        return null;
     }
+
+    private static bool LooksLikeUrl(string query) =>
+        query.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+        query.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Resolve a query into one or more tracks. When <paramref name="playlist"/> is true and the
     /// query is a playlist URL, every entry is returned; otherwise a single track.
     /// </summary>
     public async Task<IReadOnlyList<ResolvedTrack>> ResolveManyAsync(
-        string query, ulong requestedBy, bool playlist, CancellationToken ct)
+        string query, ulong requestedBy, bool playlist, CancellationToken ct, string? searchPrefix = null)
     {
         var psi = new ProcessStartInfo
         {
@@ -57,7 +81,7 @@ public sealed class TrackResolver
             psi.ArgumentList.Add("--no-playlist");
         }
         psi.ArgumentList.Add("--default-search");
-        psi.ArgumentList.Add(_options.DefaultSearchPrefix); // e.g. "scsearch"
+        psi.ArgumentList.Add(searchPrefix ?? _options.DefaultSearchPrefix); // e.g. "ytsearch"
         psi.ArgumentList.Add("--no-warnings");
 
         // One --print per field => newline-delimited, unambiguous even for titles with odd chars.

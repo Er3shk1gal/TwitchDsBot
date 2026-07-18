@@ -59,7 +59,7 @@ public sealed class MusicCommands
 
         if (track is null)
         {
-            await ctx.EditResponseAsync("Увы, для сего квеста не сыскалось ни одной играбельной баллады, дорогой оруженосец!");
+            await ctx.EditResponseAsync("Увы, для сего квеста не сыскалось ни одной играбельной баллады, дорогой Санчо!");
             return;
         }
 

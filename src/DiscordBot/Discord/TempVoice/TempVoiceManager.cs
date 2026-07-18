@@ -126,31 +126,45 @@ public sealed class TempVoiceManager
 
         try
         {
-            await member.PlaceInAsync(channel); // move the user into their new channel
+            await member.ModifyAsync(m => m.VoiceChannel = channel); // move the user into their new channel
         }
         catch (Exception ex)
         {
-            // The user likely disconnected between join and move. Since they never entered the temp
-            // channel, no "left" event will ever clean it up — tear it down now instead of leaking
-            // an empty channel until the next startup sweep.
-            _logger.LogDebug(ex, "Could not move {User} into temp channel {Channel}; removing it.", member.Id, channel.Id);
-            await DeleteChannelAndRecordAsync(channel);
+            // IMPORTANT: do NOT delete the channel here. Some gateway/library hiccups throw even when
+            // the move actually succeeded — deleting on that made freshly-created channels vanish a
+            // second after being made. The grace-period check below cleans up only if it's truly empty.
+            _logger.LogDebug(ex, "Move of {User} into temp channel {Channel} reported an error.", member.Id, channel.Id);
         }
+
+        // Safety net: a short while later, if the channel is still empty (move truly failed, or the
+        // user left immediately), remove it. Replaces the old, too-eager delete-on-move-failure.
+        ScheduleEmptyCheck(guild, channel.Id, TimeSpan.FromSeconds(30));
     }
 
-    private async Task DeleteChannelAndRecordAsync(DiscordChannel channel)
+    /// <summary>Fire-and-forget: after <paramref name="delay"/>, delete the channel if it is empty.</summary>
+    private void ScheduleEmptyCheck(DiscordGuild guild, ulong channelId, TimeSpan delay)
     {
-        try { await channel.DeleteAsync("Temp voice owner never joined"); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Failed to delete orphaned temp channel {Channel}.", channel.Id); }
-
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
-        var record = await db.TempVoiceChannels.FirstOrDefaultAsync(x => x.ChannelId == channel.Id);
-        if (record is not null)
+        _ = Task.Run(async () =>
         {
-            db.TempVoiceChannels.Remove(record);
-            await db.SaveChangesAsync();
-        }
+            try
+            {
+                await Task.Delay(delay);
+                var gate = _guildLocks.GetOrAdd(guild.Id, _ => new SemaphoreSlim(1, 1));
+                await gate.WaitAsync();
+                try
+                {
+                    await CleanupIfEmptyAsync(guild, channelId);
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Grace-period cleanup failed for temp channel {Channel}.", channelId);
+            }
+        });
     }
 
     private async Task CleanupIfEmptyAsync(DiscordGuild guild, ulong channelId)

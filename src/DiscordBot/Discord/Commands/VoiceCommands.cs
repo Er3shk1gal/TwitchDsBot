@@ -75,7 +75,7 @@ public sealed class VoiceCommands
         }
 
         await owned.Value.Channel.ModifyAsync(m => m.Bitrate = kbps * 1000);
-        await ReplyAsync(ctx, $"Вперёд, Росинант! Наши голоса звенят на **{kbps} kbps**! (Уровень бустов королевства может урезать сие, дорогой оруженосец.)");
+        await ReplyAsync(ctx, $"Вперёд, Росинант! Наши голоса звенят на **{kbps} kbps**! (Уровень бустов королевства может урезать сие, дорогой Санчо.)");
     }
 
     [Command("lock")]

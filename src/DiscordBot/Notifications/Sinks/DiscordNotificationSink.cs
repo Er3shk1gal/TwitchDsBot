@@ -68,7 +68,7 @@ public sealed class DiscordNotificationSink : INotificationSink
             ContentEventKind.LiveStarted => $"{mention}🔴 Ура, друг мой! **{who}** мчится в прямой эфир сию же секунду — вперёд, навстречу зрелищу!",
             ContentEventKind.LiveScheduled => $"{mention}📅 Внемли, доблестный товарищ! **{who}** возвестил о грядущей трансляции — нас ждёт новый квест!",
             ContentEventKind.ShortUploaded => $"{mention}🎬 Эхехе~ **{who}** являет доблестный новый Short — что за славное приключение!",
-            _ => $"{mention}📺 Не страшись, дорогой оруженосец! **{who}** герольдом возвещает славное новое видео — вперёд, смотреть!",
+            _ => $"{mention}📺 Не страшись, дорогой Санчо! **{who}** герольдом возвещает славное новое видео — вперёд, смотреть!",
         };
     }
 

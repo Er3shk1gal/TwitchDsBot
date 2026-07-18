@@ -26,10 +26,11 @@ public sealed class MusicOptions
     public string YtDlpPath { get; set; } = "yt-dlp";
 
     /// <summary>
-    /// Default search provider used when a /play query is not a URL. "scsearch" = SoundCloud.
-    /// Other yt-dlp search prefixes (e.g. "ytsearch") also work if that extractor is available.
+    /// Default search provider used when a /play query is not a URL. "ytsearch" = YouTube (widest
+    /// catalogue, avoids SoundCloud's DRM-protected tracks); "scsearch" = SoundCloud. If a search on
+    /// the default provider finds nothing, the resolver automatically retries the other one.
     /// </summary>
-    public string DefaultSearchPrefix { get; set; } = "scsearch";
+    public string DefaultSearchPrefix { get; set; } = "ytsearch";
 
     /// <summary>Default playback volume (0.0–2.0, where 1.0 = 100%).</summary>
     public double DefaultVolume { get; set; } = 1.0;
