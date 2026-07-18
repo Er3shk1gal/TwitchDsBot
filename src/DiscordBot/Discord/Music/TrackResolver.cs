@@ -96,6 +96,13 @@ public sealed class TrackResolver
         psi.ArgumentList.Add("--no-cache-dir");
         psi.ArgumentList.Add("-4");
 
+        // Optional cookies.txt — lets YouTube work from server IPs that otherwise demand a bot check.
+        if (!string.IsNullOrWhiteSpace(_options.CookiesPath) && File.Exists(_options.CookiesPath))
+        {
+            psi.ArgumentList.Add("--cookies");
+            psi.ArgumentList.Add(_options.CookiesPath);
+        }
+
         // One --print per field => newline-delimited, unambiguous even for titles with odd chars.
         // %(url)s on a format-selected item is the direct media stream URL.
         foreach (var field in PrintFields)

@@ -24,9 +24,13 @@ services:
       DATABASE__CONNECTIONSTRING: "Data Source=/app/data/bot.db"
       MUSIC__FFMPEGPATH: "ffmpeg"
       MUSIC__YTDLPPATH: "/usr/local/bin/yt-dlp"
+      # Uncomment to make YouTube work from a server IP (needs the cookies volume below):
+      # MUSIC__COOKIESPATH: "/app/cookies.txt"
 
     volumes:
       - bot-data:/app/data
+      # Put a Netscape cookies.txt next to this file and uncomment to enable YouTube cookies:
+      # - ./cookies.txt:/app/cookies.txt:ro
 
     # Outbound-only bot: no ports to expose.
     logging:

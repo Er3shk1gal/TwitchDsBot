@@ -37,6 +37,13 @@ public sealed class MusicOptions
 
     /// <summary>Leave the voice channel after this many seconds with nothing playing / no listeners.</summary>
     public int IdleTimeoutSeconds { get; set; } = 120;
+
+    /// <summary>
+    /// Optional path to a Netscape-format cookies.txt passed to yt-dlp (<c>--cookies</c>). Unlocks
+    /// YouTube on server/datacenter IPs that hit "Sign in to confirm you're not a bot". Leave empty
+    /// to disable; the file must exist at runtime or it is ignored.
+    /// </summary>
+    public string CookiesPath { get; set; } = string.Empty;
 }
 
 /// <summary>YouTube Data API v3 notifier settings, bound from the "YouTube" config section.</summary>
