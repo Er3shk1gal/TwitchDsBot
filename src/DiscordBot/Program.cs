@@ -69,7 +69,8 @@ DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Servic
             typeof(ConfigCommands),
             typeof(NotifyCommands),
             typeof(VoiceCommands),
-            typeof(MusicCommands),
+            // Music commands are temporarily disabled: VoiceNext voice playback is unstable on the
+            // current DSharpPlus 5 nightly. Re-add typeof(MusicCommands) to bring them back.
             typeof(HelpCommands),
         ]),
         new CommandsConfiguration
