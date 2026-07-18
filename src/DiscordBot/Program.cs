@@ -70,6 +70,7 @@ DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Servic
             typeof(NotifyCommands),
             typeof(VoiceCommands),
             typeof(MusicCommands),
+            typeof(HelpCommands),
         ]),
         new CommandsConfiguration
         {
