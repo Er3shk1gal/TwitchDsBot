@@ -5,14 +5,31 @@ using DSharpPlus.Entities;
 
 namespace DiscordBot.Discord.Commands;
 
-/// <summary>/help — Sancho introduces herself and lists the non-admin commands, in-character.</summary>
+/// <summary>
+/// /help — Sancho introduces herself as an interaction reply.
+/// /about — the same, but posted as a standalone channel message everyone sees.
+/// </summary>
 public sealed class HelpCommands
 {
     [Command("help")]
     [Description("Санчо расскажет о себе и своих умениях.")]
     public async ValueTask HelpAsync(SlashCommandContext ctx)
     {
-        var embed = new DiscordEmbedBuilder()
+        await ctx.RespondAsync(BuildHelpEmbed());
+    }
+
+    [Command("about")]
+    [Description("Санчо расскажет о себе отдельным сообщением — чтобы видели все.")]
+    public async ValueTask AboutAsync(SlashCommandContext ctx)
+    {
+        // Post as a normal channel message (not tied to the command reply) so everyone sees it,
+        // then quietly acknowledge the interaction to the caller only.
+        await ctx.RespondAsync("📜 Разворачиваю свиток для всех!", ephemeral: true);
+        await ctx.Channel.SendMessageAsync(BuildHelpEmbed());
+    }
+
+    private static DiscordEmbed BuildHelpEmbed() =>
+        new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(0xFFD700))
             .WithTitle("⚔️ Эхехе~ Я — Санчо, странствующий рыцарь!")
             .WithDescription(
@@ -30,10 +47,8 @@ public sealed class HelpCommands
                 "`/voice transfer <@кому>` — передать зал")
             .AddField("💡 Прочее",
                 "`/suggest <идея>` — предложить функционал для Санчо\n" +
+                "`/about` — рассказать о себе для всех\n" +
                 "`/help` — сей свиток")
             .WithFooter("Вперёд, Росинант! Правосудие восторжествует!")
             .Build();
-
-        await ctx.RespondAsync(embed);
-    }
 }
