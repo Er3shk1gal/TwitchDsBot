@@ -1,0 +1,13 @@
+# Keep the build context small and never bake secrets/build output into the image.
+**/bin/
+**/obj/
+.git/
+.gitignore
+.vs/
+.idea/
+.vscode/
+.env
+*.db
+*.db-shm
+*.db-wal
+README.md

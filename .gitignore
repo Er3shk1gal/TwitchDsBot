@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+*.user
+[Dd]ebug/
+[Rr]elease/
+
+# Secrets / local config
+.env
+appsettings.Local.json
+appsettings.Development.json
+src/DiscordBot/appsettings.json
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vs/
+.idea/
+.vscode/

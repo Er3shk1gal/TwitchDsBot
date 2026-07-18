@@ -1,0 +1,39 @@
+# Runs the whole bot in one container (bot + ffmpeg + yt-dlp baked in).
+#
+#   cp .env.example .env      # then fill in DISCORD__TOKEN (and YOUTUBE__APIKEY if you want the notifier)
+#   docker compose up -d      # build image + start
+#   docker compose logs -f    # watch it connect
+#
+# The SQLite database lives in the named volume `bot-data` so it survives restarts/rebuilds.
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: discord-bot:latest
+    container_name: discord-bot
+    restart: unless-stopped
+
+    # Secrets & settings come from .env (DISCORD__TOKEN, YOUTUBE__APIKEY, etc.).
+    env_file:
+      - .env
+
+    # These take precedence over .env so the DB always lands on the persistent volume and the
+    # media tools resolve inside the container regardless of what .env says.
+    environment:
+      DATABASE__CONNECTIONSTRING: "Data Source=/app/data/bot.db"
+      MUSIC__FFMPEGPATH: "ffmpeg"
+      MUSIC__YTDLPPATH: "/usr/local/bin/yt-dlp"
+
+    volumes:
+      - bot-data:/app/data
+
+    # Outbound-only bot: no ports to expose.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot-data:
