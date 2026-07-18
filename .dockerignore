@@ -10,4 +10,5 @@
 *.db
 *.db-shm
 *.db-wal
+cookies.txt
 README.md

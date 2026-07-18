@@ -16,6 +16,9 @@ src/DiscordBot/appsettings.json
 *.db-shm
 *.db-wal
 
+# yt-dlp cookies (account credentials — never commit)
+cookies.txt
+
 # IDE
 .vs/
 .idea/
