@@ -26,10 +26,10 @@ public sealed class MusicCommands
     }
 
     [Command("play")]
-    [Description("Play a track from SoundCloud or another open source (URL or search text).")]
+    [Description("Сыграть балладу с SoundCloud или иного вольного источника (ссылка или поиск).")]
     public async ValueTask PlayAsync(
         SlashCommandContext ctx,
-        [Description("URL or search query.")] string query)
+        [Description("Ссылка или поисковый запрос.")] string query)
     {
         if (!await EnsureDjAsync(ctx))
         {
@@ -39,7 +39,7 @@ public sealed class MusicCommands
         var voiceChannel = await GetVoiceChannelAsync(ctx.Member);
         if (voiceChannel is null)
         {
-            await ctx.RespondAsync("Join a voice channel first.", ephemeral: true);
+            await ctx.RespondAsync("Не страшись, но сперва встань в голосовом зале, дабы начать наш квест!", ephemeral: true);
             return;
         }
 
@@ -53,13 +53,13 @@ public sealed class MusicCommands
         }
         catch (Exception)
         {
-            await ctx.EditResponseAsync("Failed to resolve that query.");
+            await ctx.EditResponseAsync("Увы, друг мой, сия баллада ускользает — поиск потерпел неудачу!");
             return;
         }
 
         if (track is null)
         {
-            await ctx.EditResponseAsync("Nothing playable found for that query.");
+            await ctx.EditResponseAsync("Увы, для сего квеста не сыскалось ни одной играбельной баллады, дорогой оруженосец!");
             return;
         }
 
@@ -78,13 +78,13 @@ public sealed class MusicCommands
         }
         catch (Exception)
         {
-            await ctx.EditResponseAsync("I couldn't join your voice channel (check my permissions).");
+            await ctx.EditResponseAsync("Увы, я не смог войти в твой чертог, товарищ — проверь же мои права!");
             return;
         }
 
         if (position < 0)
         {
-            await ctx.EditResponseAsync("Couldn't queue the track — please try again.");
+            await ctx.EditResponseAsync("Увы, баллада ускользнула из нашего списка — попробуй же снова, друг мой!");
             return;
         }
 
@@ -93,23 +93,23 @@ public sealed class MusicCommands
         if (willPlayNow)
         {
             // The now-playing embed will be posted by the player loop; acknowledge the command.
-            await ctx.EditResponseAsync($"▶️ Loading **{track.Title}**…");
+            await ctx.EditResponseAsync($"▶️ Ура! Наш бард готовит балладу **{track.Title}**…");
         }
         else
         {
             await ctx.EditResponseAsync(new DiscordEmbedBuilder()
                 .WithColor(new DiscordColor(0x1DB954))
-                .WithAuthor("Added to queue")
+                .WithAuthor("Добавлено в наш список, ура!")
                 .WithTitle(track.Title)
                 .WithUrl(track.WebpageUrl)
-                .AddField("Position", $"#{position}", inline: true)
-                .AddField("Duration", track.DurationString, inline: true)
+                .AddField("Позиция", $"#{position}", inline: true)
+                .AddField("Длительность", track.DurationString, inline: true)
                 .Build());
         }
     }
 
     [Command("skip")]
-    [Description("Skip the current track.")]
+    [Description("Пропустить текущую балладу.")]
     public async ValueTask SkipAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -119,16 +119,16 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player?.Current is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
         var title = player.Current.Title;
         player.Skip();
-        await ctx.RespondAsync($"⏭️ Skipped **{title}**.");
+        await ctx.RespondAsync($"⏭️ Вперёд! Оставляем **{title}** позади и мчим к следующему стиху!");
     }
 
     [Command("stop")]
-    [Description("Stop playback and clear the queue.")]
+    [Description("Остановить балладу и очистить список.")]
     public async ValueTask StopAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -138,15 +138,15 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
         player.Stop();
-        await ctx.RespondAsync("⏹️ Stopped and cleared the queue.");
+        await ctx.RespondAsync("⏹️ Баллада умолкла, а список очищен — до нового приключения, товарищ!");
     }
 
     [Command("pause")]
-    [Description("Pause the current track.")]
+    [Description("Приостановить текущую балладу.")]
     public async ValueTask PauseAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -156,14 +156,14 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null || player.Current is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
-        await ctx.RespondAsync(player.Pause() ? "⏸️ Paused." : "Already paused.");
+        await ctx.RespondAsync(player.Pause() ? "⏸️ Наш бард замирает, чтобы перевести дух!" : "Не страшись, баллада уже отдыхает, друг мой!");
     }
 
     [Command("resume")]
-    [Description("Resume playback.")]
+    [Description("Возобновить балладу.")]
     public async ValueTask ResumeAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -173,17 +173,17 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
-        await ctx.RespondAsync(await player.ResumeAsync() ? "▶️ Resumed." : "Nothing to resume.");
+        await ctx.RespondAsync(await player.ResumeAsync() ? "▶️ Вперёд! Баллада вновь звенит над чертогом!" : "Увы, нет приостановленной баллады, чтобы оживить её, друг мой!");
     }
 
     [Command("volume")]
-    [Description("Set playback volume (0-200%).")]
+    [Description("Задать громкость баллады (0-200%).")]
     public async ValueTask VolumeAsync(
         SlashCommandContext ctx,
-        [Description("Volume percent, 0-200.")] int percent)
+        [Description("Громкость в процентах, 0-200.")] int percent)
     {
         if (!await EnsureDjAsync(ctx))
         {
@@ -192,19 +192,19 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
         percent = Math.Clamp(percent, 0, 200);
         player.SetVolume(percent / 100.0);
-        await ctx.RespondAsync($"🔊 Volume set to **{percent}%**.");
+        await ctx.RespondAsync($"🔊 Славно! Наш бард поёт теперь в **{percent}%**!");
     }
 
     [Command("seek")]
-    [Description("Seek within the current track (e.g. 90 or 1:30).")]
+    [Description("Перемотать текущую балладу (напр. 90 или 1:30).")]
     public async ValueTask SeekAsync(
         SlashCommandContext ctx,
-        [Description("Position as seconds or m:ss.")] string position)
+        [Description("Метка в секундах или m:ss.")] string position)
     {
         if (!await EnsureDjAsync(ctx))
         {
@@ -213,21 +213,21 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player?.Current is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
         if (!TryParsePosition(position, out var target))
         {
-            await ctx.RespondAsync("Couldn't parse that position. Use seconds (`90`) or `m:ss` (`1:30`).", ephemeral: true);
+            await ctx.RespondAsync("Увы, не разберу сей метки, друг мой! Используй секунды (`90`) или `m:ss` (`1:30`).", ephemeral: true);
             return;
         }
         await ctx.RespondAsync(player.Seek(target)
-            ? $"⏩ Seeking to **{Format(target)}**."
-            : "Couldn't seek.");
+            ? $"⏩ Вперёд, к стиху на отметке **{Format(target)}**!"
+            : "Увы, не сумел перескочить к сей метке, товарищ!");
     }
 
     [Command("loop")]
-    [Description("Toggle looping the current track.")]
+    [Description("Переключить повтор текущей баллады.")]
     public async ValueTask LoopAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -237,15 +237,15 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
         player.Loop = !player.Loop;
-        await ctx.RespondAsync(player.Loop ? "🔁 Loop enabled." : "➡️ Loop disabled.");
+        await ctx.RespondAsync(player.Loop ? "🔁 Ура! Сия баллада отныне будет звучать вечно!" : "➡️ Бесконечный припев расколдован — вперёд, в поход!");
     }
 
     [Command("shuffle")]
-    [Description("Shuffle the queue.")]
+    [Description("Перемешать список баллад.")]
     public async ValueTask ShuffleAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -255,66 +255,66 @@ public sealed class MusicCommands
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
-        await ctx.RespondAsync(player.Shuffle() ? "🔀 Queue shuffled." : "Not enough tracks to shuffle.");
+        await ctx.RespondAsync(player.Shuffle() ? "🔀 Ура! Наш список весело перетасован заново!" : "Увы, слишком мало баллад осталось, чтобы перемешать, друг мой!");
     }
 
     [Command("nowplaying")]
-    [Description("Show the current track.")]
+    [Description("Показать текущую балладу.")]
     public async ValueTask NowPlayingAsync(SlashCommandContext ctx)
     {
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player?.Current is null)
         {
-            await ctx.RespondAsync("Nothing is playing.", ephemeral: true);
+            await ctx.RespondAsync("Увы, чертог безмолвен — ни единой баллады не звучит, друг мой!", ephemeral: true);
             return;
         }
         await ctx.RespondAsync(MusicPlaybackService.BuildNowPlayingEmbed(player.Current));
     }
 
     [Command("queue")]
-    [Description("Show the upcoming queue.")]
+    [Description("Показать список грядущих баллад.")]
     public async ValueTask QueueAsync(SlashCommandContext ctx)
     {
         var player = _music.TryGet(ctx.Guild!.Id);
         if (player is null || (player.Current is null && player.QueueSnapshot().Count == 0))
         {
-            await ctx.RespondAsync("The queue is empty.", ephemeral: true);
+            await ctx.RespondAsync("Наш список пуст — ни единой баллады не ждёт впереди, друг мой!", ephemeral: true);
             return;
         }
 
         var sb = new StringBuilder();
         if (player.Current is { } current)
         {
-            sb.AppendLine($"**Now playing:** [{current.Title}]({current.WebpageUrl}) `{current.DurationString}`");
+            sb.AppendLine($"**Ныне наш бард поёт:** [{current.Title}]({current.WebpageUrl}) `{current.DurationString}`");
             sb.AppendLine();
         }
 
         var queue = player.QueueSnapshot();
         if (queue.Count > 0)
         {
-            sb.AppendLine("**Up next:**");
+            sb.AppendLine("**Баллады, что впереди:**");
             for (var i = 0; i < Math.Min(queue.Count, 10); i++)
             {
                 sb.AppendLine($"`{i + 1}.` [{queue[i].Title}]({queue[i].WebpageUrl}) `{queue[i].DurationString}`");
             }
             if (queue.Count > 10)
             {
-                sb.AppendLine($"…and {queue.Count - 10} more.");
+                sb.AppendLine($"…и ещё {queue.Count - 10} приключений ждут впереди!");
             }
         }
 
         await ctx.RespondAsync(new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(0x1DB954))
-            .WithTitle("Queue")
+            .WithTitle("Наш список баллад")
             .WithDescription(sb.ToString())
             .Build());
     }
 
     [Command("leave")]
-    [Description("Disconnect the bot from voice.")]
+    [Description("Покинуть голосовой зал.")]
     public async ValueTask LeaveAsync(SlashCommandContext ctx)
     {
         if (!await EnsureDjAsync(ctx))
@@ -322,7 +322,7 @@ public sealed class MusicCommands
             return;
         }
         await _music.DisconnectAsync(ctx.Guild!.Id);
-        await ctx.RespondAsync("👋 Left the voice channel.");
+        await ctx.RespondAsync("👋 Прощай покуда — я покидаю чертог! Вперёд, Росинант!");
     }
 
     /// <summary>If a DJ role is configured, require the caller to have it (admins always pass).</summary>
@@ -351,7 +351,7 @@ public sealed class MusicCommands
             return true;
         }
 
-        await ctx.RespondAsync($"You need the <@&{djRoleId.Value}> role to use music commands.", ephemeral: true);
+        await ctx.RespondAsync($"Стой, товарищ! Лишь носитель роли <@&{djRoleId.Value}> волен повелевать нашими балладами!", ephemeral: true);
         return false;
     }
 

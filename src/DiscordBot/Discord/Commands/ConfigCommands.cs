@@ -14,7 +14,7 @@ namespace DiscordBot.Discord.Commands;
 /// /config ... — server administrator settings for temp voice and music. Admin-only.
 /// </summary>
 [Command("config")]
-[Description("Configure temporary voice channels and music.")]
+[Description("Настроить временные голосовые залы и балладу-музыку.")]
 [RequireGuild]
 [RequirePermissions(DiscordPermission.Administrator)]
 public sealed class ConfigCommands
@@ -24,78 +24,78 @@ public sealed class ConfigCommands
     public ConfigCommands(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
 
     [Command("lobby")]
-    [Description("Set the 'join to create' voice channel.")]
+    [Description("Задать голосовой зал «войди, чтобы создать».")]
     public async ValueTask LobbyAsync(
         SlashCommandContext ctx,
-        [Description("The voice channel users join to spawn a temp channel.")] DiscordChannel channel)
+        [Description("Голосовой зал, войдя в который рождают временный зал.")] DiscordChannel channel)
     {
         if (channel.Type != DiscordChannelType.Voice)
         {
-            await ctx.RespondAsync("That must be a voice channel.", ephemeral: true);
+            await ctx.RespondAsync("Увы, друг мой, но это должен быть голосовой зал!", ephemeral: true);
             return;
         }
 
         await UpdateAsync(ctx.Guild!.Id, c => c.LobbyChannelId = channel.Id);
-        await ctx.RespondAsync($"Lobby channel set to {channel.Mention}. Joining it now creates a temp channel.", ephemeral: true);
+        await ctx.RespondAsync($"Ура! Зал сбора назначен — это {channel.Mention}, войди в него, и новый чертог восстанет для нашего квеста!", ephemeral: true);
     }
 
     [Command("category")]
-    [Description("Set the category new temp channels are created under.")]
+    [Description("Задать категорию, под которой рождаются временные залы.")]
     public async ValueTask CategoryAsync(
         SlashCommandContext ctx,
-        [Description("A category channel (leave temp channels here).")] DiscordChannel category)
+        [Description("Канал-категория, где обитают временные залы.")] DiscordChannel category)
     {
         if (category.Type != DiscordChannelType.Category)
         {
-            await ctx.RespondAsync("That must be a category.", ephemeral: true);
+            await ctx.RespondAsync("Не страшись, доблестный товарищ, но это должна быть категория!", ephemeral: true);
             return;
         }
 
         await UpdateAsync(ctx.Guild!.Id, c => c.TempCategoryId = category.Id);
-        await ctx.RespondAsync($"Temp channels will be created under **{category.Name}**.", ephemeral: true);
+        await ctx.RespondAsync($"Славно! Отныне новые чертоги восстанут под сенью **{category.Name}**!", ephemeral: true);
     }
 
     [Command("userlimit")]
-    [Description("Set the default user limit for new temp channels (0 = unlimited).")]
+    [Description("Задать предел гостей для новых временных залов (0 = без предела).")]
     public async ValueTask UserLimitAsync(
         SlashCommandContext ctx,
-        [Description("Default max users, 0-99.")] int limit)
+        [Description("Предел гостей по умолчанию, 0-99.")] int limit)
     {
         limit = Math.Clamp(limit, 0, 99);
         await UpdateAsync(ctx.Guild!.Id, c => c.DefaultUserLimit = limit);
-        await ctx.RespondAsync($"Default user limit set to **{(limit == 0 ? "unlimited" : limit.ToString())}**.", ephemeral: true);
+        await ctx.RespondAsync($"Ура! Отныне каждый чертог примет **{(limit == 0 ? "без счёта" : limit.ToString())}** доблестных товарищей!", ephemeral: true);
     }
 
     [Command("nametemplate")]
-    [Description("Set the temp channel name template. Use {user} for the owner's name.")]
+    [Description("Задать шаблон имени временного зала. {user} — имя владыки.")]
     public async ValueTask NameTemplateAsync(
         SlashCommandContext ctx,
-        [Description("Template, e.g. \"{user}'s room\".")] string template)
+        [Description("Шаблон, напр. \"Чертог {user}\".")] string template)
     {
         template = template.Trim();
         if (template.Length is 0 or > 90)
         {
-            await ctx.RespondAsync("Template must be 1–90 characters.", ephemeral: true);
+            await ctx.RespondAsync("Увы, друг мой, но титул должен быть в 1–90 знаков!", ephemeral: true);
             return;
         }
         await UpdateAsync(ctx.Guild!.Id, c => c.TempNameTemplate = template);
-        await ctx.RespondAsync($"Name template set to `{template}`.", ephemeral: true);
+        await ctx.RespondAsync($"Славно! Отныне каждый чертог наречётся `{template}`!", ephemeral: true);
     }
 
     [Command("djrole")]
-    [Description("Restrict music commands to a role (omit the role to allow everyone).")]
+    [Description("Отдать музыку одной роли (без роли — играть волен каждый).")]
     public async ValueTask DjRoleAsync(
         SlashCommandContext ctx,
-        [Description("Role required for music commands.")] DiscordRole? role = null)
+        [Description("Роль, нужная для команд музыки-баллады.")] DiscordRole? role = null)
     {
         await UpdateAsync(ctx.Guild!.Id, c => c.DjRoleId = role?.Id);
         await ctx.RespondAsync(role is null
-            ? "Music commands are now open to everyone."
-            : $"Music commands now require {role.Mention}.", ephemeral: true);
+            ? "Ура! Баллады барда отныне открыты каждому товарищу!"
+            : $"Да будет так! Отныне лишь носители {role.Mention} вольны призвать барда!", ephemeral: true);
     }
 
     [Command("show")]
-    [Description("Show the current configuration.")]
+    [Description("Показать нынешние настройки нашего квеста.")]
     public async ValueTask ShowAsync(SlashCommandContext ctx)
     {
         GuildConfig? config;
@@ -108,12 +108,12 @@ public sealed class ConfigCommands
         config ??= new GuildConfig { GuildId = ctx.Guild!.Id };
 
         var embed = new DiscordEmbedBuilder()
-            .WithTitle("Server configuration")
-            .AddField("Lobby channel", config.LobbyChannelId is { } l ? $"<#{l}>" : "_not set_", inline: true)
-            .AddField("Temp category", config.TempCategoryId is { } cat ? $"<#{cat}>" : "_same as lobby_", inline: true)
-            .AddField("Default user limit", config.DefaultUserLimit == 0 ? "unlimited" : config.DefaultUserLimit.ToString(), inline: true)
-            .AddField("Name template", $"`{config.TempNameTemplate}`", inline: false)
-            .AddField("DJ role", config.DjRoleId is { } dj ? $"<@&{dj}>" : "_everyone_", inline: true)
+            .WithTitle("Эхехе~ Грамота нашего квеста!")
+            .AddField("Зал сбора", config.LobbyChannelId is { } l ? $"<#{l}>" : "_зала сбора ещё нет, друг мой_", inline: true)
+            .AddField("Категория залов", config.TempCategoryId is { } cat ? $"<#{cat}>" : "_подле зала сбора_", inline: true)
+            .AddField("Предел гостей", config.DefaultUserLimit == 0 ? "товарищей без счёта" : config.DefaultUserLimit.ToString(), inline: true)
+            .AddField("Шаблон имени", $"`{config.TempNameTemplate}`", inline: false)
+            .AddField("Роль барда", config.DjRoleId is { } dj ? $"<@&{dj}>" : "_каждый товарищ_", inline: true)
             .Build();
 
         await ctx.RespondAsync(embed);

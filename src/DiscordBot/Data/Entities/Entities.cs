@@ -24,7 +24,7 @@ public sealed class GuildConfig
     public int DefaultUserLimit { get; set; }
 
     /// <summary>Name template for temp channels. "{user}" is replaced with the owner's display name.</summary>
-    public string TempNameTemplate { get; set; } = "{user}'s channel";
+    public string TempNameTemplate { get; set; } = "Зал {user}";
 
     /// <summary>Optional role required to use music commands. Null = everyone may.</summary>
     public ulong? DjRoleId { get; set; }

@@ -65,10 +65,10 @@ public sealed class DiscordNotificationSink : INotificationSink
 
         return evt.Kind switch
         {
-            ContentEventKind.LiveStarted => $"{mention}🔴 **{who}** is live now!",
-            ContentEventKind.LiveScheduled => $"{mention}📅 **{who}** scheduled a live stream.",
-            ContentEventKind.ShortUploaded => $"{mention}🎬 **{who}** posted a new Short.",
-            _ => $"{mention}📺 **{who}** posted a new video.",
+            ContentEventKind.LiveStarted => $"{mention}🔴 Ура, друг мой! **{who}** мчится в прямой эфир сию же секунду — вперёд, навстречу зрелищу!",
+            ContentEventKind.LiveScheduled => $"{mention}📅 Внемли, доблестный товарищ! **{who}** возвестил о грядущей трансляции — нас ждёт новый квест!",
+            ContentEventKind.ShortUploaded => $"{mention}🎬 Эхехе~ **{who}** являет доблестный новый Short — что за славное приключение!",
+            _ => $"{mention}📺 Не страшись, дорогой оруженосец! **{who}** герольдом возвещает славное новое видео — вперёд, смотреть!",
         };
     }
 
@@ -76,10 +76,10 @@ public sealed class DiscordNotificationSink : INotificationSink
     {
         var (color, label) = evt.Kind switch
         {
-            ContentEventKind.LiveStarted => (new DiscordColor(0xFF0000), "🔴 Live now"),
-            ContentEventKind.LiveScheduled => (new DiscordColor(0x5865F2), "📅 Upcoming stream"),
-            ContentEventKind.ShortUploaded => (new DiscordColor(0xFF0000), "🎬 New Short"),
-            _ => (new DiscordColor(0xFF0000), "📺 New video"),
+            ContentEventKind.LiveStarted => (new DiscordColor(0xFF0000), "🔴 В прямом эфире — ура!"),
+            ContentEventKind.LiveScheduled => (new DiscordColor(0x5865F2), "📅 Квест на горизонте"),
+            ContentEventKind.ShortUploaded => (new DiscordColor(0xFF0000), "🎬 Доблестный новый Short"),
+            _ => (new DiscordColor(0xFF0000), "📺 Славное новое видео"),
         };
 
         var embed = new DiscordEmbedBuilder()
@@ -97,7 +97,7 @@ public sealed class DiscordNotificationSink : INotificationSink
         if (evt.Kind == ContentEventKind.LiveScheduled && evt.ScheduledStartAt is { } start)
         {
             // Discord relative timestamp.
-            embed.AddField("Starts", $"<t:{start.ToUnixTimeSeconds()}:R>");
+            embed.AddField("Квест начнётся", $"<t:{start.ToUnixTimeSeconds()}:R>");
         }
 
         return embed.Build();

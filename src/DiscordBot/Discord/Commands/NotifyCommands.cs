@@ -17,7 +17,7 @@ namespace DiscordBot.Discord.Commands;
 /// Currently supports YouTube; Twitch/Telegram slot in the same way once their sources exist.
 /// </summary>
 [Command("notify")]
-[Description("Manage stream and upload notifications.")]
+[Description("Управление уведомлениями о стримах и новых видео.")]
 [RequireGuild]
 [RequirePermissions(DiscordPermission.Administrator)]
 public sealed class NotifyCommands
@@ -32,27 +32,27 @@ public sealed class NotifyCommands
     }
 
     [Command("youtube")]
-    [Description("Notify a channel about a YouTube channel's uploads, Shorts and live streams.")]
+    [Description("Возвещать в канал о новых видео, Shorts и стримах YouTube-канала.")]
     public async ValueTask YouTubeAsync(
         SlashCommandContext ctx,
-        [Description("YouTube channel URL, @handle or channel id.")] string youtubeChannel,
-        [Description("Discord channel to post notifications in.")] DiscordChannel target,
-        [Description("Notify on normal uploads.")] bool uploads = true,
-        [Description("Notify on Shorts.")] bool shorts = true,
-        [Description("Notify on live streams.")] bool liveStreams = true,
-        [Description("Pin live-stream messages.")] bool pinLive = false,
-        [Description("Role to mention.")] DiscordRole? mention = null)
+        [Description("URL YouTube-канала, @handle или id канала.")] string youtubeChannel,
+        [Description("Discord-канал для уведомлений.")] DiscordChannel target,
+        [Description("Уведомлять об обычных видео.")] bool uploads = true,
+        [Description("Уведомлять о Shorts.")] bool shorts = true,
+        [Description("Уведомлять о стримах.")] bool liveStreams = true,
+        [Description("Закреплять сообщения о стримах.")] bool pinLive = false,
+        [Description("Роль для упоминания.")] DiscordRole? mention = null)
     {
         if (!IsTextChannel(target))
         {
-            await ctx.RespondAsync("The target must be a text channel.", ephemeral: true);
+            await ctx.RespondAsync("Не страшись, друг мой, но сей герольд может возвещать лишь в текстовом канале!", ephemeral: true);
             return;
         }
 
         var source = _sources.FirstOrDefault(s => s.SourceType == ContentSourceType.YouTube);
         if (source is null)
         {
-            await ctx.RespondAsync("YouTube notifications aren't available (missing API key?).", ephemeral: true);
+            await ctx.RespondAsync("Увы, дорогой оруженосец, герольды YouTube почивают и не могут выступить в поход (быть может, утерян ключ API?).", ephemeral: true);
             return;
         }
 
@@ -71,7 +71,7 @@ public sealed class NotifyCommands
 
         if (resolved is null)
         {
-            await ctx.EditResponseAsync("Couldn't find that YouTube channel. Try the full channel URL or its id (starts with `UC`).");
+            await ctx.EditResponseAsync("Увы, сие царство YouTube ускользает от моих поисков, доблестный товарищ! Испробуй полный URL канала или его id (начинается с `UC`).");
             return;
         }
 
@@ -85,7 +85,7 @@ public sealed class NotifyCommands
             s.DiscordChannelId == target.Id);
         if (exists)
         {
-            await ctx.EditResponseAsync($"**{resolved.Value.DisplayName}** is already sending notifications to {target.Mention}.");
+            await ctx.EditResponseAsync($"Не страшись — деяния **{resolved.Value.DisplayName}** уже возвещаются в {target.Mention}!");
             return;
         }
 
@@ -106,13 +106,13 @@ public sealed class NotifyCommands
         await db.SaveChangesAsync();
 
         await ctx.EditResponseAsync(
-            $"✅ Now notifying {target.Mention} about **{resolved.Value.DisplayName}** " +
-            $"(uploads: {YesNo(uploads)}, shorts: {YesNo(shorts)}, live: {YesNo(liveStreams)}). " +
-            "Existing videos won't be re-announced.");
+            $"✅ Ура! Отныне я буду возвещать деяния **{resolved.Value.DisplayName}** в {target.Mention} " +
+            $"(видео: {YesNo(uploads)}, shorts: {YesNo(shorts)}, стримы: {YesNo(liveStreams)})! " +
+            "Не страшись — былые видео не будут провозглашены заново. Что за славное приключение!");
     }
 
     [Command("list")]
-    [Description("List notification subscriptions on this server.")]
+    [Description("Показать подписки на уведомления на этом сервере.")]
     public async ValueTask ListAsync(SlashCommandContext ctx)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
@@ -125,7 +125,7 @@ public sealed class NotifyCommands
 
         if (subs.Count == 0)
         {
-            await ctx.RespondAsync("No notification subscriptions yet. Add one with `/notify youtube`.", ephemeral: true);
+            await ctx.RespondAsync("Ни один герольд ещё не выехал, друг мой! Призови его через `/notify youtube` — и да начнётся квест!", ephemeral: true);
             return;
         }
 
@@ -133,25 +133,25 @@ public sealed class NotifyCommands
         foreach (var s in subs)
         {
             var kinds = new List<string>();
-            if (s.NotifyUploads) kinds.Add("uploads");
+            if (s.NotifyUploads) kinds.Add("видео");
             if (s.NotifyShorts) kinds.Add("shorts");
-            if (s.NotifyLiveStreams) kinds.Add("live");
+            if (s.NotifyLiveStreams) kinds.Add("стримы");
 
             sb.AppendLine($"`#{s.Id}` **{s.SourceType}** — {s.SourceDisplayName ?? s.SourceChannelId} → <#{s.DiscordChannelId}>");
-            sb.AppendLine($"   {string.Join(", ", kinds)}{(s.PinLiveStreams ? ", 📌 pins live" : "")}{(s.MentionRoleId is { } r ? $", mentions <@&{r}>" : "")}");
+            sb.AppendLine($"   {string.Join(", ", kinds)}{(s.PinLiveStreams ? ", 📌 закрепляет стримы" : "")}{(s.MentionRoleId is { } r ? $", упоминает <@&{r}>" : "")}");
         }
 
         await ctx.RespondAsync(new DiscordEmbedBuilder()
-            .WithTitle("Notification subscriptions")
+            .WithTitle("Баллада о герольдах — деяния, что мы возвещаем")
             .WithDescription(sb.ToString())
             .Build());
     }
 
     [Command("remove")]
-    [Description("Remove a subscription by its id (see /notify list).")]
+    [Description("Удалить подписку по её id (см. /notify list).")]
     public async ValueTask RemoveAsync(
         SlashCommandContext ctx,
-        [Description("Subscription id.")] int id)
+        [Description("Id подписки.")] int id)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
@@ -159,7 +159,7 @@ public sealed class NotifyCommands
         var sub = await db.Subscriptions.FirstOrDefaultAsync(s => s.Id == id && s.GuildId == ctx.Guild!.Id);
         if (sub is null)
         {
-            await ctx.RespondAsync("No subscription with that id on this server.", ephemeral: true);
+            await ctx.RespondAsync("Увы, ни один герольд не носит сей id в этих владениях, товарищ!", ephemeral: true);
             return;
         }
 
@@ -169,7 +169,7 @@ public sealed class NotifyCommands
         db.Subscriptions.Remove(sub);
         await db.SaveChangesAsync();
 
-        await ctx.RespondAsync($"Removed subscription `#{id}`.", ephemeral: true);
+        await ctx.RespondAsync($"Герольд `#{id}` ускакал прочь, его квест завершён — вперёд, Росинант!", ephemeral: true);
     }
 
     private static bool IsTextChannel(DiscordChannel channel) =>

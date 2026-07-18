@@ -135,18 +135,18 @@ public sealed class MusicPlaybackService
     {
         var embed = new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(0x1DB954))
-            .WithAuthor("Now playing")
+            .WithAuthor("Ныне звучит наша баллада! Ура!")
             .WithTitle(track.Title)
             .WithUrl(track.WebpageUrl)
-            .AddField("Duration", track.DurationString, inline: true);
+            .AddField("Длительность", track.DurationString, inline: true);
 
         if (!string.IsNullOrEmpty(track.Uploader))
         {
-            embed.AddField("Uploader", track.Uploader, inline: true);
+            embed.AddField("Доблестный бард", track.Uploader, inline: true);
         }
         if (track.RequestedBy != 0)
         {
-            embed.AddField("Requested by", $"<@{track.RequestedBy}>", inline: true);
+            embed.AddField("Квест поручил", $"<@{track.RequestedBy}>", inline: true);
         }
         if (!string.IsNullOrEmpty(track.ThumbnailUrl))
         {

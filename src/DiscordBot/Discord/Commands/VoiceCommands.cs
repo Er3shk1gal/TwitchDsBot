@@ -13,7 +13,7 @@ namespace DiscordBot.Discord.Commands;
 /// be connected to a temp channel they own (or be a server administrator).
 /// </summary>
 [Command("voice")]
-[Description("Manage your temporary voice channel.")]
+[Description("Повелевай своим временным голосовым чертогом.")]
 [RequireGuild]
 public sealed class VoiceCommands
 {
@@ -22,10 +22,10 @@ public sealed class VoiceCommands
     public VoiceCommands(TempVoiceManager tempVoice) => _tempVoice = tempVoice;
 
     [Command("limit")]
-    [Description("Set the user limit for your channel (0 = unlimited).")]
+    [Description("Задать лимит соратников в чертоге (0 = без предела).")]
     public async ValueTask LimitAsync(
         SlashCommandContext ctx,
-        [Description("Max users, 0-99.")] int limit)
+        [Description("Сколько соратников, 0-99.")] int limit)
     {
         limit = Math.Clamp(limit, 0, 99);
         var owned = await ResolveOwnedAsync(ctx);
@@ -35,19 +35,19 @@ public sealed class VoiceCommands
         }
 
         await owned.Value.Channel.ModifyAsync(m => m.Userlimit = limit);
-        await ReplyAsync(ctx, $"User limit set to **{(limit == 0 ? "unlimited" : limit.ToString())}**.");
+        await ReplyAsync(ctx, $"Ура! Наш чертог примет **{(limit == 0 ? "без счёта" : limit.ToString())}** доблестных товарищей!");
     }
 
     [Command("name")]
-    [Description("Rename your channel.")]
+    [Description("Дать чертогу новое имя.")]
     public async ValueTask NameAsync(
         SlashCommandContext ctx,
-        [Description("New channel name.")] string name)
+        [Description("Новое имя чертога.")] string name)
     {
         name = name.Trim();
         if (name.Length is 0 or > 100)
         {
-            await ReplyAsync(ctx, "Name must be 1–100 characters.");
+            await ReplyAsync(ctx, "Не страшись, друг мой, но имя чертога должно нести 1–100 знаков!");
             return;
         }
 
@@ -58,14 +58,14 @@ public sealed class VoiceCommands
         }
 
         await owned.Value.Channel.ModifyAsync(m => m.Name = name);
-        await ReplyAsync(ctx, $"Renamed to **{name}**.");
+        await ReplyAsync(ctx, $"Славно! Отныне наш чертог наречён **{name}**!");
     }
 
     [Command("bitrate")]
-    [Description("Set the channel bitrate in kbps (8-96, higher needs server boosts).")]
+    [Description("Задать битрейт чертога в kbps (8-96, выше требует бустов).")]
     public async ValueTask BitrateAsync(
         SlashCommandContext ctx,
-        [Description("Bitrate in kbps.")] int kbps)
+        [Description("Битрейт в kbps.")] int kbps)
     {
         kbps = Math.Clamp(kbps, 8, 384);
         var owned = await ResolveOwnedAsync(ctx);
@@ -75,11 +75,11 @@ public sealed class VoiceCommands
         }
 
         await owned.Value.Channel.ModifyAsync(m => m.Bitrate = kbps * 1000);
-        await ReplyAsync(ctx, $"Bitrate set to **{kbps} kbps**. (Server boost level may cap this.)");
+        await ReplyAsync(ctx, $"Вперёд, Росинант! Наши голоса звенят на **{kbps} kbps**! (Уровень бустов королевства может урезать сие, дорогой оруженосец.)");
     }
 
     [Command("lock")]
-    [Description("Prevent everyone from joining (existing members stay).")]
+    [Description("Запереть вход для всех (кто внутри — остаётся).")]
     public async ValueTask LockAsync(SlashCommandContext ctx)
     {
         var owned = await ResolveOwnedAsync(ctx);
@@ -90,11 +90,11 @@ public sealed class VoiceCommands
 
         await owned.Value.Channel.AddOverwriteAsync(ctx.Guild!.EveryoneRole,
             deny: DiscordPermission.Connect, reason: "temp voice lock");
-        await ReplyAsync(ctx, "🔒 Channel locked.");
+        await ReplyAsync(ctx, "🔒 Врата заперты! Никто не пройдёт без твоего дозволения, доблестный товарищ!");
     }
 
     [Command("unlock")]
-    [Description("Allow everyone to join again.")]
+    [Description("Вновь открыть вход для всех.")]
     public async ValueTask UnlockAsync(SlashCommandContext ctx)
     {
         var owned = await ResolveOwnedAsync(ctx);
@@ -105,14 +105,14 @@ public sealed class VoiceCommands
 
         await owned.Value.Channel.AddOverwriteAsync(ctx.Guild!.EveryoneRole,
             allow: DiscordPermission.Connect, reason: "temp voice unlock");
-        await ReplyAsync(ctx, "🔓 Channel unlocked.");
+        await ReplyAsync(ctx, "🔓 Врата распахнуты! Пусть все товарищи входят — ура!");
     }
 
     [Command("permit")]
-    [Description("Allow a specific user to join (useful when locked).")]
+    [Description("Дозволить войти конкретному соратнику (когда заперто).")]
     public async ValueTask PermitAsync(
         SlashCommandContext ctx,
-        [Description("User to allow.")] DiscordMember member)
+        [Description("Кому дозволить вход.")] DiscordMember member)
     {
         var owned = await ResolveOwnedAsync(ctx);
         if (owned is null)
@@ -123,14 +123,14 @@ public sealed class VoiceCommands
         await owned.Value.Channel.AddOverwriteAsync(member,
             allow: new DiscordPermissions(DiscordPermission.Connect, DiscordPermission.ViewChannel),
             reason: "temp voice permit");
-        await ReplyAsync(ctx, $"Allowed {member.Mention} to join.");
+        await ReplyAsync(ctx, $"Клянусь честью, {member.Mention} желанный гость в нашем чертоге!");
     }
 
     [Command("kick")]
-    [Description("Disconnect a user and block them from rejoining.")]
+    [Description("Изгнать соратника и закрыть ему путь назад.")]
     public async ValueTask KickAsync(
         SlashCommandContext ctx,
-        [Description("User to remove.")] DiscordMember member)
+        [Description("Кого изгнать.")] DiscordMember member)
     {
         var owned = await ResolveOwnedAsync(ctx);
         if (owned is null)
@@ -148,37 +148,37 @@ public sealed class VoiceCommands
             catch { /* best effort */ }
         }
 
-        await ReplyAsync(ctx, $"Removed {member.Mention} and blocked them from rejoining.");
+        await ReplyAsync(ctx, $"Правосудие восторжествует! {member.Mention} изгнан из нашего чертога, и путь назад ему заказан!");
     }
 
     [Command("claim")]
-    [Description("Claim ownership if the current owner has left the channel.")]
+    [Description("Заявить права на чертог, коли владелец покинул его.")]
     public async ValueTask ClaimAsync(SlashCommandContext ctx)
     {
         var channel = await GetVoiceChannelAsync(ctx.Member);
         if (channel is null)
         {
-            await ReplyAsync(ctx, "You must be in a voice channel to claim it.");
+            await ReplyAsync(ctx, "Не страшись, но сперва встань в голосовом зале, дабы начать наш квест!");
             return;
         }
 
         var record = await _tempVoice.GetRecordAsync(channel.Id);
         if (record is null)
         {
-            await ReplyAsync(ctx, "This isn't a temporary channel.");
+            await ReplyAsync(ctx, "Сей чертог не моих рук творение, друг.");
             return;
         }
 
         if (record.OwnerId == ctx.User.Id)
         {
-            await ReplyAsync(ctx, "You already own this channel.");
+            await ReplyAsync(ctx, "Эхехе~ сей чертог уж и так твой, благородный владыка!");
             return;
         }
 
         // Only allow claiming when the owner is no longer connected here.
         if (channel.Users.Any(u => u.Id == record.OwnerId))
         {
-            await ReplyAsync(ctx, "The owner is still here — you can't claim it.");
+            await ReplyAsync(ctx, "Стой, товарищ! Законный владыка сего чертога всё ещё здесь — честь не велит отнимать!");
             return;
         }
 
@@ -188,14 +188,14 @@ public sealed class VoiceCommands
                 DiscordPermission.ViewChannel, DiscordPermission.Connect,
                 DiscordPermission.Speak, DiscordPermission.MoveMembers),
             reason: "temp voice claim");
-        await ReplyAsync(ctx, "✅ You now own this channel.");
+        await ReplyAsync(ctx, "✅ Ура! Сей чертог теперь в твоей власти, доблестный владыка!");
     }
 
     [Command("transfer")]
-    [Description("Transfer ownership of your channel to another member.")]
+    [Description("Передать чертог во владение другому соратнику.")]
     public async ValueTask TransferAsync(
         SlashCommandContext ctx,
-        [Description("New owner.")] DiscordMember member)
+        [Description("Новый владелец.")] DiscordMember member)
     {
         var owned = await ResolveOwnedAsync(ctx);
         if (owned is null)
@@ -209,7 +209,7 @@ public sealed class VoiceCommands
                 DiscordPermission.ViewChannel, DiscordPermission.Connect,
                 DiscordPermission.Speak, DiscordPermission.MoveMembers),
             reason: "temp voice transfer");
-        await ReplyAsync(ctx, $"Ownership transferred to {member.Mention}.");
+        await ReplyAsync(ctx, $"Что за славное приключение! Владычество над нашим чертогом переходит к {member.Mention}!");
     }
 
     /// <summary>
@@ -221,21 +221,21 @@ public sealed class VoiceCommands
         var channel = await GetVoiceChannelAsync(ctx.Member);
         if (channel is null)
         {
-            await ReplyAsync(ctx, "You need to be in your voice channel to do that.");
+            await ReplyAsync(ctx, "Не страшись, но сперва встань в голосовом зале, дабы начать наш квест!");
             return null;
         }
 
         var record = await _tempVoice.GetRecordAsync(channel.Id);
         if (record is null)
         {
-            await ReplyAsync(ctx, "This isn't a temporary channel managed by me.");
+            await ReplyAsync(ctx, "Сей чертог не моих рук творение, друг.");
             return null;
         }
 
         var isAdmin = ctx.Member!.Permissions.HasPermission(DiscordPermission.Administrator);
         if (record.OwnerId != ctx.User.Id && !isAdmin)
         {
-            await ReplyAsync(ctx, "Only the channel owner can do that. Use `/voice claim` if the owner left.");
+            await ReplyAsync(ctx, "Стой, товарищ! Лишь законный владыка сего чертога волен им повелевать — заяви права через `/voice claim`, коли владыка бежал!");
             return null;
         }
 
