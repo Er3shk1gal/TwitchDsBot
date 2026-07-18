@@ -65,7 +65,20 @@ public sealed class MusicPlaybackService
                 return existing;
             }
 
-            var connection = _voiceNext.GetConnection(guild) ?? await _voiceNext.ConnectAsync(voiceChannel);
+            // ConnectAsync has no built-in timeout. If the voice UDP/gateway handshake never
+            // completes (common with restrictive Docker/NAT networking) it would hang forever while
+            // holding _connectLock, freezing ALL music commands. Bound it so we fail cleanly instead.
+            var connection = _voiceNext.GetConnection(guild);
+            if (connection is null)
+            {
+                var connectTask = _voiceNext.ConnectAsync(voiceChannel);
+                var finished = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(20)));
+                if (finished != connectTask)
+                {
+                    throw new TimeoutException("Voice connection timed out — the voice gateway/UDP may be unreachable.");
+                }
+                connection = await connectTask; // observe the result / surface the real error
+            }
 
             var player = new GuildMusicPlayer(
                 guild.Id,

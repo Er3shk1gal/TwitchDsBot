@@ -18,6 +18,8 @@ public sealed class GuildMusicPlayer : IAsyncDisposable
     // 20ms of 48kHz 16-bit stereo PCM — the frame size VoiceNext expects.
     private const int FrameSize = 3840;
     private static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(30);
+    // Max time to wait for ffmpeg to produce audio before giving up on a track.
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(15);
 
     private readonly ulong _guildId;
     private readonly VoiceNextConnection _connection;
@@ -389,12 +391,31 @@ public sealed class GuildMusicPlayer : IAsyncDisposable
         }
 
         await _connection.SendSpeakingAsync(true);
+        // Watchdog: if ffmpeg produces no audio for StallTimeout (stuck connecting to a dead stream),
+        // abort this track instead of blocking the player forever. Reset the window on every read.
+        using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         try
         {
             var buffer = new byte[FrameSize];
-            int read;
-            while ((read = await stdout.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+            while (true)
             {
+                readCts.CancelAfter(StallTimeout);
+                int read;
+                try
+                {
+                    read = await stdout.ReadAsync(buffer.AsMemory(0, buffer.Length), readCts.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    _logger.LogWarning("ffmpeg produced no audio for {Seconds}s; aborting track.", StallTimeout.TotalSeconds);
+                    break; // stalled — give up on this track (a real skip/stop rethrows below)
+                }
+
+                if (read <= 0)
+                {
+                    break; // end of stream
+                }
+
                 await sink.WriteAsync(new ReadOnlyMemory<byte>(buffer, 0, read), ct);
             }
             await sink.FlushAsync(ct);
