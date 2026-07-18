@@ -28,7 +28,9 @@ public sealed class HelpCommands
                 "`/voice kick <@кто>` — изгнать\n" +
                 "`/voice claim` — забрать зал, коли владыка бежал\n" +
                 "`/voice transfer <@кому>` — передать зал")
-            .AddField("ℹ️ Прочее", "`/help` — сей свиток")
+            .AddField("💡 Прочее",
+                "`/suggest <идея>` — предложить функционал для Санчо\n" +
+                "`/help` — сей свиток")
             .WithFooter("Вперёд, Росинант! Правосудие восторжествует!")
             .Build();
 

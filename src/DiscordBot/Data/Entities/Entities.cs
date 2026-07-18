@@ -28,6 +28,9 @@ public sealed class GuildConfig
 
     /// <summary>Optional role required to use music commands. Null = everyone may.</summary>
     public ulong? DjRoleId { get; set; }
+
+    /// <summary>Text channel where user /suggest submissions are posted. Null = not configured.</summary>
+    public ulong? SuggestionsChannelId { get; set; }
 }
 
 /// <summary>A live, bot-created temporary voice channel and who owns it.</summary>

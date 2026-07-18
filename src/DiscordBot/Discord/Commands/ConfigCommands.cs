@@ -94,6 +94,22 @@ public sealed class ConfigCommands
             : $"Да будет так! Отныне лишь носители {role.Mention} вольны призвать барда!", ephemeral: true);
     }
 
+    [Command("suggestions")]
+    [Description("Задать канал, куда падают предложения от /suggest.")]
+    public async ValueTask SuggestionsAsync(
+        SlashCommandContext ctx,
+        [Description("Текстовый канал для предложений.")] DiscordChannel channel)
+    {
+        if (channel.Type is not DiscordChannelType.Text and not DiscordChannelType.News)
+        {
+            await ctx.RespondAsync("Не страшись, но это должен быть текстовый канал!", ephemeral: true);
+            return;
+        }
+
+        await UpdateAsync(ctx.Guild!.Id, c => c.SuggestionsChannelId = channel.Id);
+        await ctx.RespondAsync($"Славно! Предложения товарищей отныне падают в {channel.Mention}!", ephemeral: true);
+    }
+
     [Command("show")]
     [Description("Показать нынешние настройки нашего квеста.")]
     public async ValueTask ShowAsync(SlashCommandContext ctx)
@@ -114,6 +130,7 @@ public sealed class ConfigCommands
             .AddField("Предел гостей", config.DefaultUserLimit == 0 ? "товарищей без счёта" : config.DefaultUserLimit.ToString(), inline: true)
             .AddField("Шаблон имени", $"`{config.TempNameTemplate}`", inline: false)
             .AddField("Роль барда", config.DjRoleId is { } dj ? $"<@&{dj}>" : "_каждый товарищ_", inline: true)
+            .AddField("Зал предложений", config.SuggestionsChannelId is { } sug ? $"<#{sug}>" : "_не задан_", inline: true)
             .Build();
 
         await ctx.RespondAsync(embed);

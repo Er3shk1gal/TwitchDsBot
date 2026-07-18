@@ -69,6 +69,7 @@ DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Servic
             typeof(ConfigCommands),
             typeof(NotifyCommands),
             typeof(VoiceCommands),
+            typeof(SuggestCommands),
             // Music commands are temporarily disabled: VoiceNext voice playback is unstable on the
             // current DSharpPlus 5 nightly. Re-add typeof(MusicCommands) to bring them back.
             typeof(HelpCommands),
@@ -92,6 +93,28 @@ using (var scope = host.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
     await db.Database.EnsureCreatedAsync();
+
+    // Poor-man's forward migration: EnsureCreated does NOT add new columns to an already-existing
+    // database. Add columns introduced after the DB was first created. Each ALTER is idempotent
+    // (ignored if the column already exists), so upgrades don't lose data or need a volume wipe.
+    (string Table, string Column, string Type)[] addedColumns =
+    [
+        ("Subscriptions", "PrimedAt", "TEXT"),
+        ("GuildConfigs", "SuggestionsChannelId", "INTEGER"),
+    ];
+    foreach (var (table, column, type) in addedColumns)
+    {
+        try
+        {
+            // Values are hardcoded constants above (no user input), so concatenation is injection-safe.
+            var sql = "ALTER TABLE \"" + table + "\" ADD COLUMN \"" + column + "\" " + type + " NULL";
+            await db.Database.ExecuteSqlRawAsync(sql);
+        }
+        catch
+        {
+            // Column already exists — nothing to do.
+        }
+    }
 }
 
 try
