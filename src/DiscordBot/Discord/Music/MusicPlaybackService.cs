@@ -63,7 +63,23 @@ public sealed class MusicPlaybackService
                 return existing;
             }
 
-            var connection = _bot.VoiceNext.GetConnection(guild) ?? await _bot.VoiceNext.ConnectAsync(voiceChannel);
+            var connection = _bot.VoiceNext.GetConnection(guild);
+            if (connection is null)
+            {
+                _logger.LogInformation("Connecting to voice channel {Channel} in guild {Guild}…", voiceChannel.Id, guild.Id);
+                var connectTask = _bot.VoiceNext.ConnectAsync(voiceChannel);
+                var finished = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(20)));
+                if (finished != connectTask)
+                {
+                    _ = connectTask.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default);
+                    _logger.LogWarning(
+                        "Voice connect to {Channel} timed out — the voice UDP handshake didn't complete (network?).",
+                        voiceChannel.Id);
+                    throw new TimeoutException("Voice connection timed out.");
+                }
+                connection = await connectTask;
+                _logger.LogInformation("Voice connected to channel {Channel}.", voiceChannel.Id);
+            }
 
             var player = new GuildMusicPlayer(
                 guild.Id,
