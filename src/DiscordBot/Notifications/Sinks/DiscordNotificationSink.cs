@@ -1,5 +1,5 @@
 using DiscordBot.Data.Entities;
-using DiscordBot.Discord;
+using DSharpPlus;
 using DSharpPlus.Entities;
 using Microsoft.Extensions.Logging;
 
@@ -11,12 +11,12 @@ namespace DiscordBot.Notifications.Sinks;
 /// </summary>
 public sealed class DiscordNotificationSink : INotificationSink
 {
-    private readonly BotClientAccessor _bot;
+    private readonly DiscordClient _client;
     private readonly ILogger<DiscordNotificationSink> _logger;
 
-    public DiscordNotificationSink(BotClientAccessor bot, ILogger<DiscordNotificationSink> logger)
+    public DiscordNotificationSink(DiscordClient client, ILogger<DiscordNotificationSink> logger)
     {
-        _bot = bot;
+        _client = client;
         _logger = logger;
     }
 
@@ -30,7 +30,7 @@ public sealed class DiscordNotificationSink : INotificationSink
     {
         // Let channel-lookup and send failures propagate: the dispatcher only marks an event "seen"
         // when delivery succeeds, so a transient error here is retried next cycle rather than lost.
-        var channel = await _bot.Client.GetChannelAsync(subscription.DiscordChannelId);
+        var channel = await _client.GetChannelAsync(subscription.DiscordChannelId);
 
         var builder = new DiscordMessageBuilder()
             .WithContent(BuildContent(subscription, contentEvent))

@@ -1,0 +1,35 @@
+# Lavalink server config. Mounted read-only into the container at /opt/Lavalink/application.yml.
+# Docs: https://lavalink.dev/configuration/
+server:
+  # Bind to loopback only. With `network_mode: host` this means the REST/WS API is reachable from the
+  # bot (same host) but NOT from outside the machine. Do not change to 0.0.0.0 without a firewall.
+  address: 127.0.0.1
+  port: 2333
+
+lavalink:
+  server:
+    # Must match the bot's MUSIC__LAVALINKPASSPHRASE. Supplied via the LAVALINK_PASSWORD env var.
+    password: "${LAVALINK_PASSWORD:youshallnotpass}"
+    sources:
+      # YouTube's built-in source was removed in Lavalink v4 (needs the youtube-source plugin), and
+      # datacenter IPs get bot-checked anyway — so the bot defaults to SoundCloud search. Radio uses
+      # the http source (direct stream URLs).
+      youtube: false
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    # Radio streams are live/continuous — a generous frame buffer keeps them smooth.
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    trackStuckThresholdMs: 10000
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: false
+    soundcloudSearchEnabled: true
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO

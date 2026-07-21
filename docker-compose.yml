@@ -1,11 +1,39 @@
-# Runs the whole bot in one container (bot + ffmpeg + yt-dlp baked in).
+# Runs the bot + a Lavalink audio server.
 #
 #   cp .env.example .env      # then fill in DISCORD__TOKEN (and YOUTUBE__APIKEY if you want the notifier)
-#   docker compose up -d      # build image + start
+#   docker compose up -d      # build image + start both containers
 #   docker compose logs -f    # watch it connect
 #
 # The SQLite database lives in the named volume `bot-data` so it survives restarts/rebuilds.
 services:
+  # Lavalink owns the Discord voice connection and does all the audio work (loading tracks from
+  # SoundCloud / Bandcamp / direct HTTP radio streams and streaming them into voice). It speaks a
+  # current Discord voice protocol, which is why voice works through it where VoiceNext did not.
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: lavalink
+    restart: unless-stopped
+
+    # Host networking (Linux) so Lavalink's outbound voice UDP to Discord uses the host's network
+    # path directly — the same reason the bot uses it. application.yml binds the REST/WS port to
+    # 127.0.0.1 only, so 2333 is NOT exposed off the host.
+    network_mode: host
+
+    environment:
+      # Password the bot authenticates with; override in .env (must match MUSIC__LAVALINKPASSPHRASE).
+      LAVALINK_PASSWORD: "${LAVALINK_PASSWORD:-youshallnotpass}"
+      # Keep the JVM heap small; the bot is the memory-hungry-free one here.
+      _JAVA_OPTIONS: "-Xmx256m"
+
+    volumes:
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   bot:
     build:
       context: .
@@ -14,31 +42,30 @@ services:
     container_name: discord-bot
     restart: unless-stopped
 
-    # Discord VOICE uses outbound UDP to dynamically-assigned voice servers. Docker's default bridge
-    # network commonly breaks that UDP path, so the bot joins the channel (gateway op) but the voice
-    # handshake never completes — /radio play then fails with "couldn't join". Host networking gives
-    # the container the host's network so voice UDP works like native. (Linux only; the bot exposes
-    # no ports, so this is safe. On Docker Desktop for Mac/Windows host mode behaves differently.)
+    # Start Lavalink first. Lavalink4NET reconnects with backoff, so the bot self-heals if it comes
+    # up before the JVM has finished booting — this just avoids the first-few-seconds retries.
+    depends_on:
+      - lavalink
+
+    # Discord VOICE state changes and the voice-server hand-off are forwarded to Lavalink over the
+    # gateway; Lavalink then does the voice UDP. Host networking keeps both on the host's proven
+    # network path. (Linux only; the bot exposes no ports. On Docker Desktop for Mac/Windows host
+    # mode behaves differently.)
     network_mode: host
 
     # Secrets & settings come from .env (DISCORD__TOKEN, YOUTUBE__APIKEY, etc.).
     env_file:
       - .env
 
-    # These take precedence over .env so the DB always lands on the persistent volume and the
-    # media tools resolve inside the container regardless of what .env says.
+    # These take precedence over .env so the DB always lands on the persistent volume and the bot
+    # always finds Lavalink on the loopback address regardless of what .env says.
     environment:
       DATABASE__CONNECTIONSTRING: "Data Source=/app/data/bot.db"
-      MUSIC__FFMPEGPATH: "ffmpeg"
-      MUSIC__YTDLPPATH: "/usr/local/bin/yt-dlp"
-      # Uncomment to make YouTube work from a server IP (needs the cookies volume below):
-      # MUSIC__COOKIESPATH: "/app/cookies.txt"
+      MUSIC__LAVALINKADDRESS: "http://127.0.0.1:2333"
+      MUSIC__LAVALINKPASSPHRASE: "${LAVALINK_PASSWORD:-youshallnotpass}"
 
     volumes:
       - bot-data:/app/data
-      # Put a Netscape cookies.txt next to this file and uncomment to enable YouTube cookies.
-      # NOT read-only: yt-dlp writes refreshed cookies back, which keeps them working longer.
-      # - ./cookies.txt:/app/cookies.txt
 
     # Outbound-only bot: no ports to expose.
     logging:

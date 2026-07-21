@@ -10,13 +10,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Discord (stable 4.5.x — VoiceNext voice actually works here, unlike the 5.x nightly) -->
+    <!-- Discord (stable 4.5.x) -->
     <PackageReference Include="DSharpPlus" Version="4.5.2" />
     <PackageReference Include="DSharpPlus.SlashCommands" Version="4.5.2" />
 
-    <!-- Music/radio: pure-.NET voice. Audio is fetched with yt-dlp, transcoded with FFmpeg,
-         and streamed to Discord through VoiceNext. yt-dlp + ffmpeg must be on PATH. -->
-    <PackageReference Include="DSharpPlus.VoiceNext" Version="4.5.2" />
+    <!-- Music/radio: Lavalink (a maintained audio server that owns the voice connection with a
+         current protocol, bypassing VoiceNext entirely). 4.0.27 is the last release whose newest
+         target framework is net8.0, so on net9 NuGet resolves its net8 assets and the transitive
+         Microsoft.Extensions.Http stays at 8.x — 4.1.0+ adds a net9 asset group that demands 10.x. -->
+    <PackageReference Include="Lavalink4NET.DSharpPlus" Version="4.0.27" />
+    <PackageReference Include="Lavalink4NET.InactivityTracking" Version="4.0.27" />
 
     <!-- YouTube notifier -->
     <PackageReference Include="Google.Apis.YouTube.v3" Version="1.75.0.4207" />

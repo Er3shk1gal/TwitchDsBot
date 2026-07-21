@@ -5,12 +5,13 @@ using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.SlashCommands;
 using DSharpPlus.SlashCommands.Attributes;
+using Lavalink4NET.Rest.Entities.Tracks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DiscordBot.Discord.Commands;
 
-/// <summary>/radio — admins add named streams; anyone plays one (direct URL → ffmpeg → VoiceNext).</summary>
+/// <summary>/radio — admins add named streams; anyone plays one (direct URL → Lavalink http source).</summary>
 [SlashCommandGroup("radio", "Радиопотоки Санчо: добавить и слушать.")]
 [SlashRequireGuild]
 public sealed class RadioCommands : ApplicationCommandModule
@@ -128,8 +129,8 @@ public sealed class RadioCommands : ApplicationCommandModule
             return;
         }
 
-        var voiceChannel = ctx.Member?.VoiceState?.Channel;
-        if (voiceChannel is null)
+        var voiceChannelId = ctx.Member?.VoiceState?.Channel?.Id;
+        if (voiceChannelId is null)
         {
             await ctx.ReplyAsync("Встань в голосовой зал, дабы я заиграл, друг мой!", ephemeral: true);
             return;
@@ -137,26 +138,24 @@ public sealed class RadioCommands : ApplicationCommandModule
 
         await ctx.DeferAsync();
 
-        GuildMusicPlayer player;
-        try
-        {
-            player = await _music.GetOrCreateAsync(voiceChannel, ctx.Channel);
-        }
-        catch
+        var (player, _) = await _music.GetPlayerAsync(ctx.Guild!.Id, voiceChannelId, connect: true);
+        if (player is null)
         {
             await ctx.EditAsync("Не смог войти в зал — проверьте мои права!");
             return;
         }
 
-        player.Stop(); // replace whatever was playing
-        player.Enqueue(new ResolvedTrack
+        // Radio is a single live stream: load the direct URL (Lavalink's http source) and play it,
+        // clearing whatever was queued so the stream takes over immediately.
+        var track = await _music.LoadTrackAsync(stream.Url, TrackSearchMode.None);
+        if (track is null)
         {
-            Title = "📻 " + stream.Name,
-            StreamUrl = stream.Url,
-            WebpageUrl = stream.Url,
-            IsDirectStream = true,
-            RequestedBy = ctx.User.Id,
-        });
+            await ctx.EditAsync($"Увы, поток **{stream.Name}** не отозвался — проверь URL, друг мой!");
+            return;
+        }
+
+        await player.StopAsync();
+        await player.PlayAsync(track, enqueue: false);
 
         await ctx.EditAsync($"📻 Ставлю **{stream.Name}** — да звучит вечно!");
     }
@@ -164,7 +163,11 @@ public sealed class RadioCommands : ApplicationCommandModule
     [SlashCommand("stop", "Выключить радио и покинуть зал.")]
     public async Task StopAsync(InteractionContext ctx)
     {
-        await _music.DisconnectAsync(ctx.Guild!.Id);
+        var player = await _music.TryGetAsync(ctx.Guild!.Id);
+        if (player is not null)
+        {
+            await player.DisconnectAsync();
+        }
         await ctx.ReplyAsync("📻 Радио умолкло — до новых встреч, товарищ!");
     }
 }

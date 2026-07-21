@@ -1,9 +1,9 @@
-# Discord Bot (.NET · DSharpPlus 5)
+# Discord Bot (.NET · DSharpPlus 4.5)
 
 A modular Discord bot with three features and room to grow:
 
 1. **Temporary voice channels** ("join to create") — join a configured lobby voice channel and the bot spins up a personal voice channel you control with `/voice …` (user limit, name, lock, permit, kick, bitrate, claim, transfer).
-2. **Music** — `/play` from SoundCloud and other open sources, with a queue, seek, loop, shuffle and volume. Audio is fetched with **yt-dlp**, transcoded with **FFmpeg**, and streamed through **VoiceNext** (pure .NET — no Lavalink server).
+2. **Music & radio** — `/play` from SoundCloud and other open sources, with a queue, seek, loop, shuffle and volume; `/radio` for admin-curated live streams. Audio (and the Discord voice connection) is handled by a **Lavalink** server via **Lavalink4NET**.
 3. **YouTube notifier** — posts an embed (and can pin live streams) to a chosen text channel when a watched YouTube channel uploads a video, posts a Short, or goes live.
 
 Built to extend: adding **Twitch** notifications is a new `INotificationSource`; sending notifications to **Telegram** is a new `INotificationSink`. Neither touches the core pipeline.
@@ -15,32 +15,26 @@ Built to extend: adding **Twitch** notifications is a new `INotificationSource`;
 | Concern | Choice |
 | --- | --- |
 | Language / runtime | C# / .NET 9 |
-| Discord library | DSharpPlus `5.0.0-nightly-02594` + `DSharpPlus.Commands` (slash commands) |
-| Voice / audio | `DSharpPlus.VoiceNext` + FFmpeg + yt-dlp |
+| Discord library | DSharpPlus `4.5.2` + `DSharpPlus.SlashCommands` |
+| Voice / audio | **Lavalink** server + `Lavalink4NET.DSharpPlus` |
 | Storage | SQLite via EF Core 9 |
 | YouTube | `Google.Apis.YouTube.v3` (Data API v3, API-key auth) |
 | Host | `Microsoft.Extensions.Hosting` generic host |
 
-> **Why not Lavalink?** DSharpPlus 5 is the newest (nightly) line, but the .NET Lavalink client (Lavalink4NET) is built against DSharpPlus **4.x** and fails to load under v5. So this bot plays audio the pure-.NET way (VoiceNext + FFmpeg/yt-dlp). If you would rather run Lavalink, you'd need to drop to DSharpPlus 4.5.x.
->
-> **Nightly caveat:** DSharpPlus 5 is pre-release. Keep `DSharpPlus`, `DSharpPlus.Commands` and `DSharpPlus.VoiceNext` pinned to the **same** nightly build number when upgrading.
+> **Why Lavalink?** Discord retired the old voice-gateway protocol that `DSharpPlus.VoiceNext` speaks (voice gateway `v4`), so VoiceNext connections now fail with close code `4006`. Lavalink is a dedicated audio server that owns the Discord voice connection with a current protocol and is kept up to date; the bot forwards voice state to it and it does the streaming. `Lavalink4NET` targets DSharpPlus **4.x**, which is why the bot is pinned to 4.5.2. `docker compose up` runs Lavalink for you.
 
 ---
 
 ## Prerequisites
 
-- **.NET 9 SDK** — <https://dotnet.microsoft.com/download>
-- **FFmpeg** on `PATH` (or set `Music:FfmpegPath`) — <https://ffmpeg.org/>
-- **yt-dlp** on `PATH` (or set `Music:YtDlpPath`) — <https://github.com/yt-dlp/yt-dlp>
+- **Docker** (recommended) — `docker compose up` runs the bot **and** Lavalink together; nothing else to install.
 - A **Discord bot application + token** — <https://discord.com/developers/applications>
 - A **YouTube Data API v3 key** (only for the notifier) — <https://console.cloud.google.com/>
 
-Windows (winget) quick install of the media tools:
+For running the bot **outside** Docker you also need:
 
-```powershell
-winget install Gyan.FFmpeg
-winget install yt-dlp.yt-dlp
-```
+- **.NET 9 SDK** — <https://dotnet.microsoft.com/download>
+- A reachable **Lavalink v4 server** — <https://lavalink.dev/> (point `Music:LavalinkAddress` / `Music:LavalinkPassphrase` at it).
 
 ### Discord application setup
 
@@ -59,7 +53,7 @@ Settings come from `appsettings.json` and can be overridden by environment varia
 ```json
 {
   "Discord":  { "Token": "", "DebugGuildId": null },
-  "Music":    { "FfmpegPath": "ffmpeg", "YtDlpPath": "yt-dlp", "DefaultSearchPrefix": "scsearch", "DefaultVolume": 1.0, "IdleTimeoutSeconds": 120 },
+  "Music":    { "LavalinkAddress": "http://127.0.0.1:2333", "LavalinkPassphrase": "youshallnotpass", "DefaultSearchMode": "scsearch" },
   "YouTube":  { "ApiKey": "", "PollIntervalSeconds": 180 },
   "Database": { "ConnectionString": "Data Source=bot.db" }
 }
@@ -67,7 +61,8 @@ Settings come from `appsettings.json` and can be overridden by environment varia
 
 - `Discord:Token` **(required)** — your bot token. Prefer the `DISCORD__TOKEN` env var or `.env` over committing it.
 - `Discord:DebugGuildId` — set to a guild id to register slash commands **instantly** in that server (great for development). Leave `null` for **global** registration (can take up to ~1 hour to appear).
-- `Music:DefaultSearchPrefix` — yt-dlp search provider for non-URL `/play` queries. `scsearch` = SoundCloud; `ytsearch` = YouTube (if that extractor works for you).
+- `Music:LavalinkAddress` / `Music:LavalinkPassphrase` — where the Lavalink server lives and its password. Under Docker these are set for you (loopback + `LAVALINK_PASSWORD`).
+- `Music:DefaultSearchMode` — search prefix for non-URL `/play` queries: `scsearch` = SoundCloud, `bcsearch` = Bandcamp, `ytsearch` = YouTube (needs the youtube-source plugin on the Lavalink server).
 - `YouTube:ApiKey` — omit to disable the notifier entirely (the `/notify youtube` command will report it's unavailable).
 - `YouTube:PollIntervalSeconds` — how often each subscription is polled. Mind the quota (below).
 
@@ -75,7 +70,7 @@ Environment-variable form (identical effect):
 
 ```
 DISCORD__TOKEN=...            DISCORD__DEBUGGUILDID=123456789012345678
-MUSIC__YTDLPPATH=yt-dlp       MUSIC__FFMPEGPATH=ffmpeg
+MUSIC__LAVALINKADDRESS=http://127.0.0.1:2333   MUSIC__DEFAULTSEARCHMODE=scsearch
 YOUTUBE__APIKEY=...           YOUTUBE__POLLINTERVALSECONDS=180
 DATABASE__CONNECTIONSTRING=Data Source=bot.db
 ```
@@ -96,18 +91,18 @@ On start the bot creates `bot.db`, connects to Discord, registers slash commands
 
 ### Run with Docker (recommended)
 
-The image bundles the bot **plus FFmpeg and yt-dlp** — nothing else to install. Only Docker is required.
+`docker compose` starts two containers: the **bot** and a **Lavalink** audio server. Only Docker is required.
 
 ```bash
 cp .env.example .env          # fill in DISCORD__TOKEN (and YOUTUBE__APIKEY for the notifier)
-docker compose up -d          # build image + start
+docker compose up -d          # build the bot image, pull Lavalink, start both
 docker compose logs -f        # watch it connect
 ```
 
-- Settings come from `.env` (see `.env.example`). The compose file forces the DB and media-tool paths for the container, so you don't touch those in `.env`.
+- Settings come from `.env` (see `.env.example`). The compose file wires the bot to Lavalink on the loopback address and forces the DB path, so you don't touch those in `.env`.
+- Both containers use **host networking** (Linux) so Discord voice UDP takes the host's network path. Lavalink binds its API to `127.0.0.1` only, so port `2333` is not exposed off the machine.
 - The SQLite database persists in the named volume **`bot-data`** across restarts and rebuilds.
 - Update the bot: `docker compose up -d --build`. Stop it: `docker compose down` (add `-v` to also wipe the database volume).
-- yt-dlp inside the image is the latest release at build time; rebuild periodically to refresh it (`docker compose build --no-cache`).
 
 ---
 
@@ -171,10 +166,8 @@ Discord/
   Events/VoiceStateHandler      -> TempVoiceManager (join-to-create + startup sweep)
   TempVoice/TempVoiceManager    create / track ownership / clean up temp channels
   Music/
-    TrackResolver               yt-dlp: query -> ResolvedTrack (metadata + stream URL)
-    GuildMusicPlayer            per-guild queue + FFmpeg -> VoiceNext transmit loop
-    MusicPlaybackService        owns players & voice connections
-  Commands/                     /config /voice /music /notify slash commands
+    MusicPlaybackService        wraps Lavalink4NET IAudioService (retrieve player, load, play)
+  Commands/                     /config /voice /music /radio /notify slash commands
 Notifications/
   ContentEvent                  source-agnostic "something new" event
   INotificationSource           produces events (YouTube today; Twitch later)
@@ -214,7 +207,7 @@ Every event is already fanned out to **all** applicable sinks, so YouTube→Disc
 
 - The database uses `EnsureCreated` (no migrations). If you change the entity model, delete `bot.db` or switch to EF Core migrations.
 - One temp channel is created per lobby join and deleted when it empties; a startup sweep cleans up any left over after a crash.
-- Music playback needs FFmpeg + yt-dlp reachable; `/play` reports a clear error if resolution fails.
+- Music/radio playback needs the Lavalink server reachable; `/play` reports a clear error if a track can't be loaded. Lavalink4NET reconnects automatically if Lavalink restarts.
 - **Shorts detection** treats videos ≤ 60 s as Shorts (no official API flag exists); some longer Shorts are announced as regular uploads.
 - **YouTube Premieres** that carry live-stream metadata are announced via the live/upcoming path, not the plain-upload path — the API can't distinguish a finished Premiere from a finished live stream.
 - **Live pinning** pins each new live announcement; it does not unpin older ones. Watch Discord's 50-pin-per-channel limit on very active channels.

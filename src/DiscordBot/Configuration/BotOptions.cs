@@ -14,36 +14,26 @@ public sealed class DiscordOptions
     public ulong? DebugGuildId { get; set; }
 }
 
-/// <summary>Music playback settings, bound from the "Music" config section.</summary>
+/// <summary>
+/// Music/radio playback settings, bound from the "Music" config section. Playback runs through a
+/// Lavalink server (which owns the Discord voice connection), so no ffmpeg/yt-dlp is needed here.
+/// </summary>
 public sealed class MusicOptions
 {
     public const string Section = "Music";
 
-    /// <summary>Path to the ffmpeg executable. "ffmpeg" resolves via PATH.</summary>
-    public string FfmpegPath { get; set; } = "ffmpeg";
+    /// <summary>Base HTTP address of the Lavalink server (REST + WebSocket).</summary>
+    public string LavalinkAddress { get; set; } = "http://localhost:2333";
 
-    /// <summary>Path to the yt-dlp executable (resolves tracks from SoundCloud &amp; other sources). "yt-dlp" resolves via PATH.</summary>
-    public string YtDlpPath { get; set; } = "yt-dlp";
-
-    /// <summary>
-    /// Default search provider used when a /play query is not a URL. "ytsearch" = YouTube (widest
-    /// catalogue, avoids SoundCloud's DRM-protected tracks); "scsearch" = SoundCloud. If a search on
-    /// the default provider finds nothing, the resolver automatically retries the other one.
-    /// </summary>
-    public string DefaultSearchPrefix { get; set; } = "ytsearch";
-
-    /// <summary>Default playback volume (0.0–2.0, where 1.0 = 100%).</summary>
-    public double DefaultVolume { get; set; } = 1.0;
-
-    /// <summary>Leave the voice channel after this many seconds with nothing playing / no listeners.</summary>
-    public int IdleTimeoutSeconds { get; set; } = 120;
+    /// <summary>Lavalink server password (must match the server's <c>lavalink.server.password</c>).</summary>
+    public string LavalinkPassphrase { get; set; } = "youshallnotpass";
 
     /// <summary>
-    /// Optional path to a Netscape-format cookies.txt passed to yt-dlp (<c>--cookies</c>). Unlocks
-    /// YouTube on server/datacenter IPs that hit "Sign in to confirm you're not a bot". Leave empty
-    /// to disable; the file must exist at runtime or it is ignored.
+    /// Search prefix used when a /play query is not a URL. "scsearch" = SoundCloud (built into
+    /// Lavalink, no API key, no bot-detection); "ytsearch" = YouTube (needs the youtube-source
+    /// plugin on the Lavalink server); "bcsearch" = Bandcamp.
     /// </summary>
-    public string CookiesPath { get; set; } = string.Empty;
+    public string DefaultSearchMode { get; set; } = "scsearch";
 }
 
 /// <summary>YouTube Data API v3 notifier settings, bound from the "YouTube" config section.</summary>

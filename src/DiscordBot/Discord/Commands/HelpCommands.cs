@@ -42,6 +42,12 @@ public sealed class HelpCommands : ApplicationCommandModule
                 "`/voice kick <@кто>` — изгнать\n" +
                 "`/voice claim` — забрать зал, коли владыка бежал\n" +
                 "`/voice transfer <@кому>` — передать зал")
+            .AddField("🎵 Баллады",
+                "`/play <ссылка или поиск>` — сыграть балладу (SoundCloud и иные вольные источники)\n" +
+                "`/skip` · `/stop` · `/pause` · `/resume` — правь потоком\n" +
+                "`/queue` · `/nowplaying` — список и что звучит ныне\n" +
+                "`/volume <0-200>` · `/seek <m:ss>` · `/loop` · `/shuffle`\n" +
+                "`/leave` — покинуть зал")
             .AddField("📻 Радио",
                 "`/radio play <поток>` — включить радио (выбор из добавленных)\n" +
                 "`/radio list` — список потоков\n" +

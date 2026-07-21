@@ -10,12 +10,14 @@ using DiscordBot.Notifications.Sinks;
 using DiscordBot.Notifications.Sources;
 using DSharpPlus;
 using DSharpPlus.SlashCommands;
-using DSharpPlus.VoiceNext;
+using Lavalink4NET.Clients;
+using Lavalink4NET.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 // Load a local .env (if present) into environment variables before configuration is read.
 LoadDotEnv();
@@ -26,9 +28,8 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
     ContentRootPath = AppContext.BaseDirectory,
 });
 
-// --- Logging: quiet EF query spam, and surface VoiceNext's voice-handshake details for debugging ---
+// --- Logging: quiet EF query spam ---
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
-builder.Logging.AddFilter("DSharpPlus", LogLevel.Debug);
 
 // --- Options ---
 builder.Services.Configure<DiscordOptions>(builder.Configuration.GetSection(DiscordOptions.Section));
@@ -49,11 +50,28 @@ if (string.IsNullOrWhiteSpace(discordOptions.Token))
 // --- Persistence ---
 builder.Services.AddDbContext<BotDbContext>(options => options.UseSqlite(databaseOptions.ConnectionString));
 
+// --- Discord client (registered in DI so Lavalink4NET's DiscordClientWrapper can resolve it) ---
+builder.Services.AddSingleton(sp => new DiscordClient(new DiscordConfiguration
+{
+    Token = discordOptions.Token,
+    TokenType = TokenType.Bot,
+    Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildVoiceStates | DiscordIntents.GuildMembers,
+    LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
+}));
+
+// --- Lavalink (owns the Discord voice connection; music/radio audio flows through it) ---
+builder.Services.AddLavalink();
+builder.Services.ConfigureLavalink(options =>
+{
+    var music = builder.Configuration.GetSection(MusicOptions.Section).Get<MusicOptions>() ?? new MusicOptions();
+    options.BaseAddress = new Uri(music.LavalinkAddress);
+    options.Passphrase = music.LavalinkPassphrase;
+    options.ReadyTimeout = TimeSpan.FromSeconds(20);
+});
+
 // --- Shared application services ---
 builder.Services.AddHttpClient();
-builder.Services.AddSingleton<BotClientAccessor>();
 builder.Services.AddSingleton<TempVoiceManager>();
-builder.Services.AddSingleton<TrackResolver>();
 builder.Services.AddSingleton<MusicPlaybackService>();
 builder.Services.AddSingleton<DiscordEventHandlers>();
 
@@ -101,20 +119,12 @@ using (var scope = host.Services.CreateScope())
     catch { /* table/index already exist */ }
 }
 
-// --- DSharpPlus v4 client (created after the host so command modules resolve from host.Services) ---
-var discord = new DiscordClient(new DiscordConfiguration
-{
-    Token = discordOptions.Token,
-    TokenType = TokenType.Bot,
-    Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildVoiceStates | DiscordIntents.GuildMembers,
-    LoggerFactory = host.Services.GetRequiredService<ILoggerFactory>(),
-});
+// --- DSharpPlus v4 client (the DI singleton; command modules resolve from host.Services) ---
+var discord = host.Services.GetRequiredService<DiscordClient>();
 
-var voiceNext = discord.UseVoiceNext(new VoiceNextConfiguration());
-
-var accessor = host.Services.GetRequiredService<BotClientAccessor>();
-accessor.Client = discord;
-accessor.VoiceNext = voiceNext;
+// Eagerly build Lavalink's DiscordClientWrapper so it subscribes to the gateway's voice events
+// (VoiceStateUpdated / VoiceServerUpdated) BEFORE we connect — otherwise it could miss the ready.
+_ = host.Services.GetRequiredService<IDiscordClientWrapper>();
 
 var slash = discord.UseSlashCommands(new SlashCommandsConfiguration { Services = host.Services });
 var debugGuild = discordOptions.DebugGuildId; // null => global registration
