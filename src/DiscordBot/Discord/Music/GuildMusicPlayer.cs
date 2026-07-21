@@ -520,8 +520,16 @@ public sealed class GuildMusicPlayer : IAsyncDisposable
 
     private void SafeDisconnect()
     {
-        try { _connection.Disconnect(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Voice disconnect failed for guild {Guild}.", _guildId); }
+        var connection = _connection;
+        // VoiceNext.Disconnect() is sync-over-async (DisconnectAsync().GetAwaiter().GetResult()) and
+        // can hang/deadlock on the current nightly. Called inline from the loop's finally and from
+        // DisposeAsync — under _connectLock — a hang there froze ALL music/radio. Offload it so it
+        // never blocks the player; fire-and-forget with its own error guard.
+        _ = Task.Run(() =>
+        {
+            try { connection.Disconnect(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Voice disconnect failed for guild {Guild}.", _guildId); }
+        });
     }
 
     public async ValueTask DisposeAsync()
