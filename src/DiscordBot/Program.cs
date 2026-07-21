@@ -26,6 +26,10 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
     ContentRootPath = AppContext.BaseDirectory,
 });
 
+// --- Logging: quiet EF query spam, and surface VoiceNext's voice-handshake details for debugging ---
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+builder.Logging.AddFilter("DSharpPlus", LogLevel.Debug);
+
 // --- Options ---
 builder.Services.Configure<DiscordOptions>(builder.Configuration.GetSection(DiscordOptions.Section));
 builder.Services.Configure<MusicOptions>(builder.Configuration.GetSection(MusicOptions.Section));
