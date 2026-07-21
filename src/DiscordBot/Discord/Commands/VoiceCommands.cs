@@ -22,7 +22,7 @@ public sealed class VoiceCommands : ApplicationCommandModule
     [SlashCommand("limit", "Задать лимит соратников в чертоге (0 = без предела).")]
     public async Task LimitAsync(
         InteractionContext ctx,
-        [Option("limit", "Сколько соратников, 0-99.")] int limit)
+        [Option("limit", "Сколько соратников, 0-99.")] long limit)
     {
         limit = Math.Clamp(limit, 0, 99);
         var owned = await ResolveOwnedAsync(ctx);
@@ -31,7 +31,7 @@ public sealed class VoiceCommands : ApplicationCommandModule
             return;
         }
 
-        await owned.Value.Channel.ModifyAsync(m => m.Userlimit = limit);
+        await owned.Value.Channel.ModifyAsync(m => m.Userlimit = (int)limit);
         await ReplyAsync(ctx, $"Ура! Наш чертог примет **{(limit == 0 ? "без счёта" : limit.ToString())}** доблестных товарищей!");
     }
 
@@ -60,7 +60,7 @@ public sealed class VoiceCommands : ApplicationCommandModule
     [SlashCommand("bitrate", "Задать битрейт чертога в kbps (8-96, выше требует бустов).")]
     public async Task BitrateAsync(
         InteractionContext ctx,
-        [Option("kbps", "Битрейт в kbps.")] int kbps)
+        [Option("kbps", "Битрейт в kbps.")] long kbps)
     {
         kbps = Math.Clamp(kbps, 8, 384);
         var owned = await ResolveOwnedAsync(ctx);
@@ -69,7 +69,7 @@ public sealed class VoiceCommands : ApplicationCommandModule
             return;
         }
 
-        await owned.Value.Channel.ModifyAsync(m => m.Bitrate = kbps * 1000);
+        await owned.Value.Channel.ModifyAsync(m => m.Bitrate = (int)(kbps * 1000));
         await ReplyAsync(ctx, $"Вперёд, Росинант! Наши голоса звенят на **{kbps} kbps**! (Уровень бустов королевства может урезать сие, дорогой Санчо.)");
     }
 
@@ -104,11 +104,18 @@ public sealed class VoiceCommands : ApplicationCommandModule
     [SlashCommand("permit", "Дозволить войти конкретному соратнику (когда заперто).")]
     public async Task PermitAsync(
         InteractionContext ctx,
-        [Option("member", "Кому дозволить вход.")] DiscordMember member)
+        [Option("member", "Кому дозволить вход.")] DiscordUser user)
     {
         var owned = await ResolveOwnedAsync(ctx);
         if (owned is null)
         {
+            return;
+        }
+
+        var member = await ResolveMemberAsync(ctx, user);
+        if (member is null)
+        {
+            await ReplyAsync(ctx, "Не сыскал сего товарища в наших рядах!");
             return;
         }
 
@@ -121,11 +128,18 @@ public sealed class VoiceCommands : ApplicationCommandModule
     [SlashCommand("kick", "Изгнать соратника и закрыть ему путь назад.")]
     public async Task KickAsync(
         InteractionContext ctx,
-        [Option("member", "Кого изгнать.")] DiscordMember member)
+        [Option("member", "Кого изгнать.")] DiscordUser user)
     {
         var owned = await ResolveOwnedAsync(ctx);
         if (owned is null)
         {
+            return;
+        }
+
+        var member = await ResolveMemberAsync(ctx, user);
+        if (member is null)
+        {
+            await ReplyAsync(ctx, "Не сыскал сего товарища в наших рядах!");
             return;
         }
 
@@ -184,11 +198,18 @@ public sealed class VoiceCommands : ApplicationCommandModule
     [SlashCommand("transfer", "Передать чертог во владение другому соратнику.")]
     public async Task TransferAsync(
         InteractionContext ctx,
-        [Option("member", "Новый владелец.")] DiscordMember member)
+        [Option("member", "Новый владелец.")] DiscordUser user)
     {
         var owned = await ResolveOwnedAsync(ctx);
         if (owned is null)
         {
+            return;
+        }
+
+        var member = await ResolveMemberAsync(ctx, user);
+        if (member is null)
+        {
+            await ReplyAsync(ctx, "Не сыскал сего товарища в наших рядах!");
             return;
         }
 
@@ -233,4 +254,12 @@ public sealed class VoiceCommands : ApplicationCommandModule
 
     private static async Task ReplyAsync(InteractionContext ctx, string message) =>
         await ctx.ReplyAsync(message, ephemeral: true);
+
+    // v4 slash user-options resolve to DiscordUser; fetch the guild member for role/overwrite ops.
+    private static async Task<DiscordMember?> ResolveMemberAsync(InteractionContext ctx, DiscordUser user)
+    {
+        try { return await ctx.Guild!.GetMemberAsync(user.Id); }
+        catch { return null; }
+    }
 }
+

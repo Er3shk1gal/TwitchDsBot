@@ -176,7 +176,7 @@ public sealed class MusicCommands : ApplicationCommandModule
     [SlashCommand("volume", "Задать громкость баллады (0-200%).")]
     public async Task VolumeAsync(
         InteractionContext ctx,
-        [Option("percent", "Громкость в процентах, 0-200.")] int percent)
+        [Option("percent", "Громкость в процентах, 0-200.")] long percent)
     {
         if (!await EnsureDjAsync(ctx))
         {

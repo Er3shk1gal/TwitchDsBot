@@ -54,10 +54,10 @@ public sealed class ConfigCommands : ApplicationCommandModule
     [SlashCommand("userlimit", "Задать предел гостей для новых временных залов (0 = без предела).")]
     public async Task UserLimitAsync(
         InteractionContext ctx,
-        [Option("limit", "Предел гостей по умолчанию, 0-99.")] int limit)
+        [Option("limit", "Предел гостей по умолчанию, 0-99.")] long limit)
     {
         limit = Math.Clamp(limit, 0, 99);
-        await UpdateAsync(ctx.Guild!.Id, c => c.DefaultUserLimit = limit);
+        await UpdateAsync(ctx.Guild!.Id, c => c.DefaultUserLimit = (int)limit);
         await ctx.ReplyAsync($"Ура! Отныне каждый чертог примет **{(limit == 0 ? "без счёта" : limit.ToString())}** доблестных товарищей!", ephemeral: true);
     }
 

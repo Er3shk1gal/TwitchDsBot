@@ -146,12 +146,13 @@ public sealed class NotifyCommands : ApplicationCommandModule
     [SlashCommand("remove", "Удалить подписку по её id (см. /notify list).")]
     public async Task RemoveAsync(
         InteractionContext ctx,
-        [Option("id", "Id подписки.")] int id)
+        [Option("id", "Id подписки.")] long id)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
-        var sub = await db.Subscriptions.FirstOrDefaultAsync(s => s.Id == id && s.GuildId == ctx.Guild!.Id);
+        var idInt = (int)id;
+        var sub = await db.Subscriptions.FirstOrDefaultAsync(s => s.Id == idInt && s.GuildId == ctx.Guild!.Id);
         if (sub is null)
         {
             await ctx.ReplyAsync("Увы, ни один герольд не носит сей id в этих владениях, товарищ!", ephemeral: true);
