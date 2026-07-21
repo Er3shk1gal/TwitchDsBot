@@ -14,6 +14,13 @@ services:
     container_name: discord-bot
     restart: unless-stopped
 
+    # Discord VOICE uses outbound UDP to dynamically-assigned voice servers. Docker's default bridge
+    # network commonly breaks that UDP path, so the bot joins the channel (gateway op) but the voice
+    # handshake never completes — /radio play then fails with "couldn't join". Host networking gives
+    # the container the host's network so voice UDP works like native. (Linux only; the bot exposes
+    # no ports, so this is safe. On Docker Desktop for Mac/Windows host mode behaves differently.)
+    network_mode: host
+
     # Secrets & settings come from .env (DISCORD__TOKEN, YOUTUBE__APIKEY, etc.).
     env_file:
       - .env
