@@ -7,18 +7,16 @@
     <Nullable>enable</Nullable>
     <RootNamespace>DiscordBot</RootNamespace>
     <AssemblyName>DiscordBot</AssemblyName>
-    <!-- DSharpPlus 5 nightly is a prerelease; silence NU5104 prerelease-dependency noise. -->
-    <NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Discord -->
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02594" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02594" />
+    <!-- Discord (stable 4.5.x — VoiceNext voice actually works here, unlike the 5.x nightly) -->
+    <PackageReference Include="DSharpPlus" Version="4.5.2" />
+    <PackageReference Include="DSharpPlus.SlashCommands" Version="4.5.2" />
 
-    <!-- Music: pure-.NET voice. Audio is fetched with yt-dlp, transcoded with FFmpeg,
+    <!-- Music/radio: pure-.NET voice. Audio is fetched with yt-dlp, transcoded with FFmpeg,
          and streamed to Discord through VoiceNext. yt-dlp + ffmpeg must be on PATH. -->
-    <PackageReference Include="DSharpPlus.VoiceNext" Version="5.0.0-nightly-02594" />
+    <PackageReference Include="DSharpPlus.VoiceNext" Version="4.5.2" />
 
     <!-- YouTube notifier -->
     <PackageReference Include="Google.Apis.YouTube.v3" Version="1.75.0.4207" />

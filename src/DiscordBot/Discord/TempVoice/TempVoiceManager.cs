@@ -1,10 +1,11 @@
 using DiscordBot.Data;
 using DiscordBot.Data.Entities;
-using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Permissions = DSharpPlus.Permissions;
 
 namespace DiscordBot.Discord.TempVoice;
 
@@ -36,13 +37,11 @@ public sealed class TempVoiceManager
         {
             var config = await GetConfigAsync(guild.Id);
 
-            // Joined the lobby -> create a personal channel and move the user into it.
             if (afterChannelId is { } joined && config?.LobbyChannelId == joined)
             {
                 await CreateForAsync(guild, userId, config!);
             }
 
-            // Left a channel -> if it was a temp channel and is now empty, delete it.
             if (beforeChannelId is { } left && left != afterChannelId)
             {
                 await CleanupIfEmptyAsync(guild, left);
@@ -61,22 +60,19 @@ public sealed class TempVoiceManager
         {
             member = await guild.GetMemberAsync(userId);
         }
-        catch (DSharpPlus.Exceptions.NotFoundException)
+        catch (NotFoundException)
         {
             return;
         }
 
-        // Explicit category if configured; otherwise fall back to the lobby channel's own category
-        // (the documented "same as lobby" behaviour) rather than the guild root.
         DiscordChannel? category = null;
         if (config.TempCategoryId is { } categoryId)
         {
-            category = await TryGetChannelAsync(guild, categoryId);
+            category = guild.GetChannel(categoryId);
         }
         else if (config.LobbyChannelId is { } lobbyId)
         {
-            var lobby = await TryGetChannelAsync(guild, lobbyId);
-            category = lobby?.Parent;
+            category = guild.GetChannel(lobbyId)?.Parent;
         }
 
         var name = config.TempNameTemplate.Replace("{user}", member.DisplayName);
@@ -85,14 +81,10 @@ public sealed class TempVoiceManager
             name = name[..100];
         }
 
-        // Grant the owner management-relevant permissions on their own channel.
         var overwrites = new List<DiscordOverwriteBuilder>
         {
-            new DiscordOverwriteBuilder(member).Allow(new DiscordPermissions(
-                DiscordPermission.ViewChannel,
-                DiscordPermission.Connect,
-                DiscordPermission.Speak,
-                DiscordPermission.MoveMembers)),
+            new DiscordOverwriteBuilder(member).Allow(
+                Permissions.AccessChannels | Permissions.UseVoice | Permissions.Speak | Permissions.MoveMembers),
         };
 
         DiscordChannel channel;
@@ -101,7 +93,7 @@ public sealed class TempVoiceManager
             channel = await guild.CreateVoiceChannelAsync(
                 name: name,
                 parent: category,
-                userLimit: config.DefaultUserLimit > 0 ? config.DefaultUserLimit : null,
+                user_limit: config.DefaultUserLimit > 0 ? config.DefaultUserLimit : null,
                 overwrites: overwrites,
                 reason: $"Temp voice for {member.Username}");
         }
@@ -126,22 +118,17 @@ public sealed class TempVoiceManager
 
         try
         {
-            await member.ModifyAsync(m => m.VoiceChannel = channel); // move the user into their new channel
+            await member.ModifyAsync(m => m.VoiceChannel = channel);
         }
         catch (Exception ex)
         {
-            // IMPORTANT: do NOT delete the channel here. Some gateway/library hiccups throw even when
-            // the move actually succeeded — deleting on that made freshly-created channels vanish a
-            // second after being made. The grace-period check below cleans up only if it's truly empty.
+            // Don't delete on move failure — grace-period check below handles a genuinely empty channel.
             _logger.LogDebug(ex, "Move of {User} into temp channel {Channel} reported an error.", member.Id, channel.Id);
         }
 
-        // Safety net: a short while later, if the channel is still empty (move truly failed, or the
-        // user left immediately), remove it. Replaces the old, too-eager delete-on-move-failure.
         ScheduleEmptyCheck(guild, channel.Id, TimeSpan.FromSeconds(30));
     }
 
-    /// <summary>Fire-and-forget: after <paramref name="delay"/>, delete the channel if it is empty.</summary>
     private void ScheduleEmptyCheck(DiscordGuild guild, ulong channelId, TimeSpan delay)
     {
         _ = Task.Run(async () =>
@@ -175,13 +162,12 @@ public sealed class TempVoiceManager
         var record = await db.TempVoiceChannels.FirstOrDefaultAsync(x => x.ChannelId == channelId);
         if (record is null)
         {
-            return; // not a temp channel we manage
+            return;
         }
 
-        var channel = await TryGetChannelAsync(guild, channelId);
+        var channel = guild.GetChannel(channelId);
         if (channel is null)
         {
-            // Already gone on Discord's side; just drop the record.
             db.TempVoiceChannels.Remove(record);
             await db.SaveChangesAsync();
             return;
@@ -216,10 +202,10 @@ public sealed class TempVoiceManager
         {
             if (!byGuild.TryGetValue(record.GuildId, out var guild))
             {
-                continue; // guild not available this session; leave the record for later
+                continue;
             }
 
-            var channel = await TryGetChannelAsync(guild, record.ChannelId);
+            var channel = guild.GetChannel(record.ChannelId);
             if (channel is null)
             {
                 db.TempVoiceChannels.Remove(record);
@@ -261,17 +247,5 @@ public sealed class TempVoiceManager
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
         return await db.GuildConfigs.AsNoTracking().FirstOrDefaultAsync(x => x.GuildId == guildId);
-    }
-
-    private static async Task<DiscordChannel?> TryGetChannelAsync(DiscordGuild guild, ulong channelId)
-    {
-        try
-        {
-            return await guild.GetChannelAsync(channelId);
-        }
-        catch (DSharpPlus.Exceptions.NotFoundException)
-        {
-            return null;
-        }
     }
 }

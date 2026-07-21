@@ -1,22 +1,19 @@
-using System.ComponentModel;
 using DiscordBot.Data;
 using DiscordBot.Data.Entities;
 using DiscordBot.Discord.Music;
-using DSharpPlus.Commands;
-using DSharpPlus.Commands.ContextChecks;
-using DSharpPlus.Commands.Processors.SlashCommands;
-using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
+using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.SlashCommands;
+using DSharpPlus.SlashCommands.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DiscordBot.Discord.Commands;
 
 /// <summary>/radio — admins add named streams; anyone plays one (direct URL → ffmpeg → VoiceNext).</summary>
-[Command("radio")]
-[Description("Радиопотоки Санчо: добавить и слушать.")]
-[RequireGuild]
-public sealed class RadioCommands
+[SlashCommandGroup("radio", "Радиопотоки Санчо: добавить и слушать.")]
+[SlashRequireGuild]
+public sealed class RadioCommands : ApplicationCommandModule
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly MusicPlaybackService _music;
@@ -27,25 +24,24 @@ public sealed class RadioCommands
         _music = music;
     }
 
-    [Command("add")]
-    [Description("Добавить радиопоток (админ).")]
-    [RequirePermissions(DiscordPermission.Administrator)]
-    public async ValueTask AddAsync(
-        SlashCommandContext ctx,
-        [Description("Название потока.")] string name,
-        [Description("Прямой URL аудиопотока (http/https).")] string url)
+    [SlashCommand("add", "Добавить радиопоток (админ).")]
+    [SlashRequirePermissions(Permissions.Administrator)]
+    public async Task AddAsync(
+        InteractionContext ctx,
+        [Option("name", "Название потока.")] string name,
+        [Option("url", "Прямой URL аудиопотока (http/https).")] string url)
     {
         name = name.Trim();
         url = url.Trim();
         if (name.Length is 0 or > 80)
         {
-            await ctx.RespondAsync("Название должно быть в 1–80 знаков, друг мой!", ephemeral: true);
+            await ctx.ReplyAsync("Название должно быть в 1–80 знаков, друг мой!", ephemeral: true);
             return;
         }
         if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
             !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            await ctx.RespondAsync("URL должен начинаться с `http://` или `https://`!", ephemeral: true);
+            await ctx.ReplyAsync("URL должен начинаться с `http://` или `https://`!", ephemeral: true);
             return;
         }
 
@@ -53,7 +49,7 @@ public sealed class RadioCommands
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
         if (await db.RadioStreams.AnyAsync(s => s.GuildId == ctx.Guild!.Id && s.Name == name))
         {
-            await ctx.RespondAsync($"Поток **{name}** уже в наших свитках!", ephemeral: true);
+            await ctx.ReplyAsync($"Поток **{name}** уже в наших свитках!", ephemeral: true);
             return;
         }
 
@@ -65,34 +61,32 @@ public sealed class RadioCommands
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await db.SaveChangesAsync();
-        await ctx.RespondAsync($"Славно! Поток **{name}** вписан в свитки — зови его через `/radio play`!", ephemeral: true);
+        await ctx.ReplyAsync($"Славно! Поток **{name}** вписан в свитки — зови его через `/radio play`!", ephemeral: true);
     }
 
-    [Command("remove")]
-    [Description("Убрать радиопоток (админ).")]
-    [RequirePermissions(DiscordPermission.Administrator)]
-    public async ValueTask RemoveAsync(
-        SlashCommandContext ctx,
-        [Description("Название потока.")]
-        [SlashAutoCompleteProvider(typeof(RadioAutoCompleteProvider))] string name)
+    [SlashCommand("remove", "Убрать радиопоток (админ).")]
+    [SlashRequirePermissions(Permissions.Administrator)]
+    public async Task RemoveAsync(
+        InteractionContext ctx,
+        [Option("name", "Название потока.")]
+        [Autocomplete(typeof(RadioAutoCompleteProvider))] string name)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
         var stream = await db.RadioStreams.FirstOrDefaultAsync(s => s.GuildId == ctx.Guild!.Id && s.Name == name);
         if (stream is null)
         {
-            await ctx.RespondAsync("Нет такого потока в свитках, друг мой.", ephemeral: true);
+            await ctx.ReplyAsync("Нет такого потока в свитках, друг мой.", ephemeral: true);
             return;
         }
 
         db.RadioStreams.Remove(stream);
         await db.SaveChangesAsync();
-        await ctx.RespondAsync($"Поток **{name}** вычеркнут из свитков.", ephemeral: true);
+        await ctx.ReplyAsync($"Поток **{name}** вычеркнут из свитков.", ephemeral: true);
     }
 
-    [Command("list")]
-    [Description("Показать добавленные радиопотоки.")]
-    public async ValueTask ListAsync(SlashCommandContext ctx)
+    [SlashCommand("list", "Показать добавленные радиопотоки.")]
+    public async Task ListAsync(InteractionContext ctx)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
@@ -103,24 +97,23 @@ public sealed class RadioCommands
 
         if (streams.Count == 0)
         {
-            await ctx.RespondAsync("Свитки пусты — пусть владыка добавит поток через `/radio add`.", ephemeral: true);
+            await ctx.ReplyAsync("Свитки пусты — пусть владыка добавит поток через `/radio add`.", ephemeral: true);
             return;
         }
 
         var list = string.Join("\n", streams.Select(s => $"📻 **{s.Name}**"));
-        await ctx.RespondAsync(new DiscordEmbedBuilder()
+        await ctx.ReplyAsync(new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(0x1DB954))
             .WithTitle("Радиопотоки Санчо")
             .WithDescription(list)
             .Build());
     }
 
-    [Command("play")]
-    [Description("Включить радиопоток из добавленных.")]
-    public async ValueTask PlayAsync(
-        SlashCommandContext ctx,
-        [Description("Какой поток включить.")]
-        [SlashAutoCompleteProvider(typeof(RadioAutoCompleteProvider))] string name)
+    [SlashCommand("play", "Включить радиопоток из добавленных.")]
+    public async Task PlayAsync(
+        InteractionContext ctx,
+        [Option("name", "Какой поток включить.")]
+        [Autocomplete(typeof(RadioAutoCompleteProvider))] string name)
     {
         RadioStream? stream;
         await using (var scope = _scopeFactory.CreateAsyncScope())
@@ -131,18 +124,18 @@ public sealed class RadioCommands
         }
         if (stream is null)
         {
-            await ctx.RespondAsync("Нет такого потока — глянь `/radio list`.", ephemeral: true);
+            await ctx.ReplyAsync("Нет такого потока — глянь `/radio list`.", ephemeral: true);
             return;
         }
 
-        var voiceChannel = await GetVoiceChannelAsync(ctx.Member);
+        var voiceChannel = ctx.Member?.VoiceState?.Channel;
         if (voiceChannel is null)
         {
-            await ctx.RespondAsync("Встань в голосовой зал, дабы я заиграл, друг мой!", ephemeral: true);
+            await ctx.ReplyAsync("Встань в голосовой зал, дабы я заиграл, друг мой!", ephemeral: true);
             return;
         }
 
-        await ctx.DeferResponseAsync();
+        await ctx.DeferAsync();
 
         GuildMusicPlayer player;
         try
@@ -151,7 +144,7 @@ public sealed class RadioCommands
         }
         catch
         {
-            await ctx.EditResponseAsync("Не смог войти в зал — проверьте мои права!");
+            await ctx.EditAsync("Не смог войти в зал — проверьте мои права!");
             return;
         }
 
@@ -165,43 +158,32 @@ public sealed class RadioCommands
             RequestedBy = ctx.User.Id,
         });
 
-        await ctx.EditResponseAsync($"📻 Ставлю **{stream.Name}** — да звучит вечно!");
+        await ctx.EditAsync($"📻 Ставлю **{stream.Name}** — да звучит вечно!");
     }
 
-    [Command("stop")]
-    [Description("Выключить радио и покинуть зал.")]
-    public async ValueTask StopAsync(SlashCommandContext ctx)
+    [SlashCommand("stop", "Выключить радио и покинуть зал.")]
+    public async Task StopAsync(InteractionContext ctx)
     {
         await _music.DisconnectAsync(ctx.Guild!.Id);
-        await ctx.RespondAsync("📻 Радио умолкло — до новых встреч, товарищ!");
-    }
-
-    private static async Task<DiscordChannel?> GetVoiceChannelAsync(DiscordMember? member)
-    {
-        var state = member?.VoiceState;
-        if (state?.ChannelId is null)
-        {
-            return null;
-        }
-        return await state.GetChannelAsync();
+        await ctx.ReplyAsync("📻 Радио умолкло — до новых встреч, товарищ!");
     }
 }
 
 /// <summary>Autocompletes a radio stream name from the guild's saved streams.</summary>
-public sealed class RadioAutoCompleteProvider : IAutoCompleteProvider
+public sealed class RadioAutoCompleteProvider : IAutocompleteProvider
 {
-    public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
+    public async Task<IEnumerable<DiscordAutoCompleteChoice>> Provider(AutocompleteContext context)
     {
         if (context.Guild is null)
         {
             return [];
         }
 
-        var scopeFactory = context.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var scopeFactory = context.Services.GetRequiredService<IServiceScopeFactory>();
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
-        var input = context.UserInput ?? string.Empty;
+        var input = (context.OptionValue as string ?? string.Empty);
         var streams = await db.RadioStreams.AsNoTracking()
             .Where(s => s.GuildId == context.Guild.Id)
             .OrderBy(s => s.Name)

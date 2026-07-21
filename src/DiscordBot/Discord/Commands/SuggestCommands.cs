@@ -1,32 +1,30 @@
-using System.ComponentModel;
 using DiscordBot.Data;
-using DSharpPlus.Commands;
-using DSharpPlus.Commands.ContextChecks;
-using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.SlashCommands;
+using DSharpPlus.SlashCommands.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DiscordBot.Discord.Commands;
 
 /// <summary>/suggest — any user proposes a feature; it's posted to the configured suggestions channel.</summary>
-[RequireGuild]
-public sealed class SuggestCommands
+[SlashRequireGuild]
+public sealed class SuggestCommands : ApplicationCommandModule
 {
     private readonly IServiceScopeFactory _scopeFactory;
 
     public SuggestCommands(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
 
-    [Command("suggest")]
-    [Description("Предложить идею или функционал для Санчо.")]
-    public async ValueTask SuggestAsync(
-        SlashCommandContext ctx,
-        [Description("Твоя идея.")] string idea)
+    [SlashCommand("suggest", "Предложить идею или функционал для Санчо.")]
+    public async Task SuggestAsync(
+        InteractionContext ctx,
+        [Option("idea", "Твоя идея.")] string idea)
     {
         idea = idea.Trim();
         if (idea.Length is 0 or > 1500)
         {
-            await ctx.RespondAsync("Молви яснее, друг мой — идея должна быть в 1–1500 знаков!", ephemeral: true);
+            await ctx.ReplyAsync("Молви яснее, друг мой — идея должна быть в 1–1500 знаков!", ephemeral: true);
             return;
         }
 
@@ -42,7 +40,7 @@ public sealed class SuggestCommands
 
         if (channelId is null)
         {
-            await ctx.RespondAsync(
+            await ctx.ReplyAsync(
                 "Увы, зал для предложений ещё не назначен — попроси владыку задать его через `/config suggestions`.",
                 ephemeral: true);
             return;
@@ -51,11 +49,11 @@ public sealed class SuggestCommands
         DiscordChannel channel;
         try
         {
-            channel = await ctx.Guild!.GetChannelAsync(channelId.Value);
+            channel = ctx.Guild!.GetChannel(channelId.Value);
         }
         catch
         {
-            await ctx.RespondAsync(
+            await ctx.ReplyAsync(
                 "Не могу сыскать зал для предложений — быть может, его снесли? Пусть владыка перезадаст `/config suggestions`.",
                 ephemeral: true);
             return;
@@ -85,13 +83,13 @@ public sealed class SuggestCommands
         }
         catch
         {
-            await ctx.RespondAsync(
+            await ctx.ReplyAsync(
                 "Не смог доставить идею в зал предложений — проверьте мои права в том канале.",
                 ephemeral: true);
             return;
         }
 
-        await ctx.RespondAsync(
+        await ctx.ReplyAsync(
             "Ура! Твоя идея услышана и отправлена на суд — благодарю, доблестный товарищ!",
             ephemeral: true);
     }

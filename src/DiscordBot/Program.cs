@@ -9,18 +9,17 @@ using DiscordBot.Notifications;
 using DiscordBot.Notifications.Sinks;
 using DiscordBot.Notifications.Sources;
 using DSharpPlus;
-using DSharpPlus.Commands;
+using DSharpPlus.SlashCommands;
 using DSharpPlus.VoiceNext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 // Load a local .env (if present) into environment variables before configuration is read.
 LoadDotEnv();
 
-// Anchor the content root to the binary's folder so appsettings.json is found no matter which
-// directory the bot is launched from.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
     Args = args,
@@ -48,61 +47,28 @@ builder.Services.AddDbContext<BotDbContext>(options => options.UseSqlite(databas
 
 // --- Shared application services ---
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<BotClientAccessor>();
 builder.Services.AddSingleton<TempVoiceManager>();
 builder.Services.AddSingleton<TrackResolver>();
 builder.Services.AddSingleton<MusicPlaybackService>();
+builder.Services.AddSingleton<DiscordEventHandlers>();
 
-// Notification pipeline: Discord sink always; YouTube source only when an API key is present.
 builder.Services.AddSingleton<INotificationSink, DiscordNotificationSink>();
 if (!string.IsNullOrWhiteSpace(youTubeOptions.ApiKey))
 {
     builder.Services.AddSingleton<INotificationSource, YouTubeNotificationSource>();
 }
 
-// --- Discord client (integrated with the generic host's service collection) ---
-// GuildMembers is a PRIVILEGED intent (needed for auto-role on join) — it must be enabled in the
-// Discord Developer Portal (Bot → Privileged Gateway Intents → Server Members Intent) or the bot
-// will fail to connect.
-var intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildVoiceStates | DiscordIntents.GuildMembers;
-
-DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Services)
-    .UseCommands(
-        (_, extension) => extension.AddCommands(
-        [
-            typeof(ConfigCommands),
-            typeof(NotifyCommands),
-            typeof(VoiceCommands),
-            typeof(SuggestCommands),
-            typeof(RadioCommands),
-            // On-demand music (/play) is temporarily disabled: yt-dlp-based VoiceNext playback is
-            // unstable on the current DSharpPlus 5 nightly. Re-add typeof(MusicCommands) to restore.
-            typeof(HelpCommands),
-        ]),
-        new CommandsConfiguration
-        {
-            RegisterDefaultCommandProcessors = true,
-            DebugGuildId = discordOptions.DebugGuildId ?? 0,
-        })
-    .UseVoiceNext(new VoiceNextConfiguration())
-    .ConfigureEventHandlers(events => events
-        .AddEventHandlers<VoiceStateHandler>()
-        .AddEventHandlers<MemberJoinHandler>());
-
-// --- Hosted services (order matters: connect Discord before the notifier polls) ---
-builder.Services.AddHostedService<DiscordStartupService>();
 builder.Services.AddHostedService<NotificationDispatcher>();
 
 var host = builder.Build();
 
-// Ensure the database schema exists.
+// --- Ensure the database schema exists (+ forward-migrate columns/tables on existing DBs) ---
 using (var scope = host.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
     await db.Database.EnsureCreatedAsync();
 
-    // Poor-man's forward migration: EnsureCreated does NOT add new columns to an already-existing
-    // database. Add columns introduced after the DB was first created. Each ALTER is idempotent
-    // (ignored if the column already exists), so upgrades don't lose data or need a volume wipe.
     (string Table, string Column, string Type)[] addedColumns =
     [
         ("Subscriptions", "PrimedAt", "TEXT"),
@@ -113,17 +79,12 @@ using (var scope = host.Services.CreateScope())
     {
         try
         {
-            // Values are hardcoded constants above (no user input), so concatenation is injection-safe.
             var sql = "ALTER TABLE \"" + table + "\" ADD COLUMN \"" + column + "\" " + type + " NULL";
             await db.Database.ExecuteSqlRawAsync(sql);
         }
-        catch
-        {
-            // Column already exists — nothing to do.
-        }
+        catch { /* column already exists */ }
     }
 
-    // New tables added after the DB was first created (EnsureCreated won't add them either).
     try
     {
         await db.Database.ExecuteSqlRawAsync(
@@ -133,27 +94,60 @@ using (var scope = host.Services.CreateScope())
         await db.Database.ExecuteSqlRawAsync(
             "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_RadioStreams_GuildId_Name\" ON \"RadioStreams\" (\"GuildId\", \"Name\")");
     }
-    catch
-    {
-        // Table/index already exist.
-    }
+    catch { /* table/index already exist */ }
+}
+
+// --- DSharpPlus v4 client (created after the host so command modules resolve from host.Services) ---
+var discord = new DiscordClient(new DiscordConfiguration
+{
+    Token = discordOptions.Token,
+    TokenType = TokenType.Bot,
+    Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildVoiceStates | DiscordIntents.GuildMembers,
+    LoggerFactory = host.Services.GetRequiredService<ILoggerFactory>(),
+});
+
+var voiceNext = discord.UseVoiceNext(new VoiceNextConfiguration());
+
+var accessor = host.Services.GetRequiredService<BotClientAccessor>();
+accessor.Client = discord;
+accessor.VoiceNext = voiceNext;
+
+var slash = discord.UseSlashCommands(new SlashCommandsConfiguration { Services = host.Services });
+var debugGuild = discordOptions.DebugGuildId; // null => global registration
+slash.RegisterCommands<ConfigCommands>(debugGuild);
+slash.RegisterCommands<NotifyCommands>(debugGuild);
+slash.RegisterCommands<VoiceCommands>(debugGuild);
+slash.RegisterCommands<SuggestCommands>(debugGuild);
+slash.RegisterCommands<RadioCommands>(debugGuild);
+slash.RegisterCommands<MusicCommands>(debugGuild);
+slash.RegisterCommands<HelpCommands>(debugGuild);
+
+var events = host.Services.GetRequiredService<DiscordEventHandlers>();
+discord.VoiceStateUpdated += events.OnVoiceStateUpdated;
+discord.GuildDownloadCompleted += events.OnGuildDownloadCompleted;
+discord.GuildMemberAdded += events.OnGuildMemberAdded;
+
+try
+{
+    await discord.ConnectAsync();
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"Failed to connect to Discord: {ex.Message}");
+    return 1;
 }
 
 try
 {
     await host.RunAsync();
 }
-catch (DSharpPlus.Exceptions.UnauthorizedException)
-{
-    // Already logged a clear message in DiscordStartupService; exit non-zero without a stack dump.
-    return 1;
-}
 catch (Exception ex)
 {
-    // Swallow shutdown/disposal hiccups (e.g. disposing a client that never finished connecting)
-    // so they don't surface as an unhandled crash.
     Console.Error.WriteLine($"Host terminated: {ex.Message}");
-    return 1;
+}
+finally
+{
+    try { await discord.DisconnectAsync(); } catch { /* ignore */ }
 }
 
 return 0;

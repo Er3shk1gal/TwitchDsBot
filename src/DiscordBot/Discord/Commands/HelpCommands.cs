@@ -1,7 +1,6 @@
-using System.ComponentModel;
-using DSharpPlus.Commands;
-using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.SlashCommands;
 
 namespace DiscordBot.Discord.Commands;
 
@@ -9,22 +8,20 @@ namespace DiscordBot.Discord.Commands;
 /// /help — Sancho introduces herself as an interaction reply.
 /// /about — the same, but posted as a standalone channel message everyone sees.
 /// </summary>
-public sealed class HelpCommands
+public sealed class HelpCommands : ApplicationCommandModule
 {
-    [Command("help")]
-    [Description("Санчо расскажет о себе и своих умениях.")]
-    public async ValueTask HelpAsync(SlashCommandContext ctx)
+    [SlashCommand("help", "Санчо расскажет о себе и своих умениях.")]
+    public async Task HelpAsync(InteractionContext ctx)
     {
-        await ctx.RespondAsync(BuildHelpEmbed());
+        await ctx.ReplyAsync(BuildHelpEmbed());
     }
 
-    [Command("about")]
-    [Description("Санчо расскажет о себе отдельным сообщением — чтобы видели все.")]
-    public async ValueTask AboutAsync(SlashCommandContext ctx)
+    [SlashCommand("about", "Санчо расскажет о себе отдельным сообщением — чтобы видели все.")]
+    public async Task AboutAsync(InteractionContext ctx)
     {
         // Post as a normal channel message (not tied to the command reply) so everyone sees it,
         // then quietly acknowledge the interaction to the caller only.
-        await ctx.RespondAsync("📜 Разворачиваю свиток для всех!", ephemeral: true);
+        await ctx.ReplyAsync("📜 Разворачиваю свиток для всех!", ephemeral: true);
         await ctx.Channel.SendMessageAsync(BuildHelpEmbed());
     }
 
