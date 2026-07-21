@@ -13,6 +13,9 @@ public sealed record ResolvedTrack
     /// <summary>Id of the user who requested the track (for "requested by" display).</summary>
     public ulong RequestedBy { get; init; }
 
+    /// <summary>True for direct stream URLs (radio): play the URL as-is, skip the yt-dlp re-resolve.</summary>
+    public bool IsDirectStream { get; init; }
+
     public string DurationString => Duration is { } d
         ? (d.TotalHours >= 1 ? d.ToString(@"h\:mm\:ss") : d.ToString(@"m\:ss"))
         : "live/unknown";

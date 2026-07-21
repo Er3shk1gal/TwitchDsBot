@@ -15,6 +15,7 @@ public sealed class BotDbContext : DbContext
     public DbSet<TempVoiceChannel> TempVoiceChannels => Set<TempVoiceChannel>();
     public DbSet<NotificationSubscription> Subscriptions => Set<NotificationSubscription>();
     public DbSet<SeenContent> SeenContent => Set<SeenContent>();
+    public DbSet<RadioStream> RadioStreams => Set<RadioStream>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -51,6 +52,12 @@ public sealed class BotDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.SubscriptionId, x.ExternalId, x.EventKind }).IsUnique();
+        });
+
+        b.Entity<RadioStream>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.GuildId, x.Name }).IsUnique();
         });
     }
 }

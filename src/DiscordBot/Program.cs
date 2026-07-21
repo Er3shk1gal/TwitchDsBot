@@ -73,8 +73,9 @@ DiscordClientBuilder.CreateDefault(discordOptions.Token, intents, builder.Servic
             typeof(NotifyCommands),
             typeof(VoiceCommands),
             typeof(SuggestCommands),
-            // Music commands are temporarily disabled: VoiceNext voice playback is unstable on the
-            // current DSharpPlus 5 nightly. Re-add typeof(MusicCommands) to bring them back.
+            typeof(RadioCommands),
+            // On-demand music (/play) is temporarily disabled: yt-dlp-based VoiceNext playback is
+            // unstable on the current DSharpPlus 5 nightly. Re-add typeof(MusicCommands) to restore.
             typeof(HelpCommands),
         ]),
         new CommandsConfiguration
@@ -120,6 +121,21 @@ using (var scope = host.Services.CreateScope())
         {
             // Column already exists — nothing to do.
         }
+    }
+
+    // New tables added after the DB was first created (EnsureCreated won't add them either).
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS \"RadioStreams\" (" +
+            "\"Id\" INTEGER NOT NULL CONSTRAINT \"PK_RadioStreams\" PRIMARY KEY AUTOINCREMENT, " +
+            "\"GuildId\" INTEGER NOT NULL, \"Name\" TEXT NOT NULL, \"Url\" TEXT NOT NULL, \"CreatedAt\" TEXT NOT NULL)");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_RadioStreams_GuildId_Name\" ON \"RadioStreams\" (\"GuildId\", \"Name\")");
+    }
+    catch
+    {
+        // Table/index already exist.
     }
 }
 

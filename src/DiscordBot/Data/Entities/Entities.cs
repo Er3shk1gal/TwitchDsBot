@@ -88,6 +88,21 @@ public sealed class NotificationSubscription
     public DateTimeOffset? PrimedAt { get; set; }
 }
 
+/// <summary>A named radio stream (direct audio URL) an admin added for a guild.</summary>
+public sealed class RadioStream
+{
+    public int Id { get; set; }
+
+    public ulong GuildId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Direct audio stream URL (played straight through ffmpeg, no yt-dlp).</summary>
+    public string Url { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 /// <summary>Dedup record so each subscription notifies about a given item exactly once.</summary>
 public sealed class SeenContent
 {

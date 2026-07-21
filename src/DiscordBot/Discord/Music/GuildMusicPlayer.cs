@@ -431,6 +431,11 @@ public sealed class GuildMusicPlayer : IAsyncDisposable
     // so a stalled yt-dlp can't hang playback forever; on timeout/failure fall back to the cached URL.
     private async Task<string> ResolveFreshStreamUrlAsync(ResolvedTrack track, CancellationToken ct)
     {
+        if (track.IsDirectStream)
+        {
+            return track.StreamUrl; // radio: the URL is already a playable stream, no yt-dlp needed
+        }
+
         using var resolveCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         resolveCts.CancelAfter(ResolveTimeout);
         try
