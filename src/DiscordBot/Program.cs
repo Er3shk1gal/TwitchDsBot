@@ -8,6 +8,7 @@ using DiscordBot.Discord.TempVoice;
 using DiscordBot.Notifications;
 using DiscordBot.Notifications.Sinks;
 using DiscordBot.Notifications.Sources;
+using DiscordBot.Twitch;
 using DSharpPlus;
 using DSharpPlus.SlashCommands;
 using Lavalink4NET.Clients;
@@ -35,11 +36,17 @@ builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 builder.Services.Configure<DiscordOptions>(builder.Configuration.GetSection(DiscordOptions.Section));
 builder.Services.Configure<MusicOptions>(builder.Configuration.GetSection(MusicOptions.Section));
 builder.Services.Configure<YouTubeOptions>(builder.Configuration.GetSection(YouTubeOptions.Section));
+builder.Services.Configure<TwitchOptions>(builder.Configuration.GetSection(TwitchOptions.Section));
+builder.Services.Configure<TelegramOptions>(builder.Configuration.GetSection(TelegramOptions.Section));
+builder.Services.Configure<TwitchChatOptions>(builder.Configuration.GetSection(TwitchChatOptions.Section));
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.Section));
 
 var discordOptions = builder.Configuration.GetSection(DiscordOptions.Section).Get<DiscordOptions>() ?? new DiscordOptions();
 var databaseOptions = builder.Configuration.GetSection(DatabaseOptions.Section).Get<DatabaseOptions>() ?? new DatabaseOptions();
 var youTubeOptions = builder.Configuration.GetSection(YouTubeOptions.Section).Get<YouTubeOptions>() ?? new YouTubeOptions();
+var twitchOptions = builder.Configuration.GetSection(TwitchOptions.Section).Get<TwitchOptions>() ?? new TwitchOptions();
+var telegramOptions = builder.Configuration.GetSection(TelegramOptions.Section).Get<TelegramOptions>() ?? new TelegramOptions();
+var twitchChatOptions = builder.Configuration.GetSection(TwitchChatOptions.Section).Get<TwitchChatOptions>() ?? new TwitchChatOptions();
 
 if (string.IsNullOrWhiteSpace(discordOptions.Token))
 {
@@ -80,8 +87,25 @@ if (!string.IsNullOrWhiteSpace(youTubeOptions.ApiKey))
 {
     builder.Services.AddSingleton<INotificationSource, YouTubeNotificationSource>();
 }
+if (!string.IsNullOrWhiteSpace(twitchOptions.ClientId) && !string.IsNullOrWhiteSpace(twitchOptions.ClientSecret))
+{
+    builder.Services.AddSingleton<INotificationSource, TwitchNotificationSource>();
+}
+if (!string.IsNullOrWhiteSpace(telegramOptions.BotToken))
+{
+    builder.Services.AddSingleton<INotificationSink, TelegramNotificationSink>();
+}
 
 builder.Services.AddHostedService<NotificationDispatcher>();
+
+// Twitch chat responder is a separate concern (not the notification pipeline): only runs when a
+// user token, bot username and at least one channel are configured.
+if (!string.IsNullOrWhiteSpace(twitchChatOptions.OAuthToken)
+    && !string.IsNullOrWhiteSpace(twitchChatOptions.BotUsername)
+    && twitchChatOptions.Channels.Count > 0)
+{
+    builder.Services.AddHostedService<TwitchChatBot>();
+}
 
 var host = builder.Build();
 
@@ -94,6 +118,7 @@ using (var scope = host.Services.CreateScope())
     (string Table, string Column, string Type)[] addedColumns =
     [
         ("Subscriptions", "PrimedAt", "TEXT"),
+        ("Subscriptions", "TelegramChatId", "TEXT"),
         ("GuildConfigs", "SuggestionsChannelId", "INTEGER"),
         ("GuildConfigs", "AutoRoleId", "INTEGER"),
     ];

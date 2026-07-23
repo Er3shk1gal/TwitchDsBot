@@ -68,8 +68,15 @@ public sealed class NotificationSubscription
     /// <summary>Discord text channel that notifications are posted to.</summary>
     public ulong DiscordChannelId { get; set; }
 
-    /// <summary>Optional role mentioned in notifications.</summary>
+    /// <summary>Optional role mentioned in notifications (Discord only).</summary>
     public ulong? MentionRoleId { get; set; }
+
+    /// <summary>
+    /// Optional Telegram delivery target, in addition to <see cref="DiscordChannelId"/>: either a
+    /// numeric chat id (e.g. "-1001234567890") or a public channel/group "@username". Null = don't
+    /// mirror this subscription to Telegram. Set/cleared via <c>/notify telegram</c>.
+    /// </summary>
+    public string? TelegramChatId { get; set; }
 
     public bool NotifyUploads { get; set; } = true;
     public bool NotifyShorts { get; set; } = true;

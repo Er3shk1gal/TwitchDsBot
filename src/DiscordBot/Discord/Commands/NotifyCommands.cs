@@ -13,7 +13,8 @@ namespace DiscordBot.Discord.Commands;
 
 /// <summary>
 /// /notify ... — manage where new-video / Shorts / live-stream notifications are posted. Admin-only.
-/// Currently supports YouTube; Twitch/Telegram slot in the same way once their sources exist.
+/// Supports YouTube and Twitch as sources; every subscription's Discord target is mandatory, and
+/// <c>/notify telegram</c> additionally mirrors an existing subscription to a Telegram chat.
 /// </summary>
 [SlashCommandGroup("notify", "Управление уведомлениями о стримах и новых видео.")]
 [SlashRequireGuild]
@@ -22,11 +23,14 @@ public sealed class NotifyCommands : ApplicationCommandModule
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IEnumerable<INotificationSource> _sources;
+    private readonly IEnumerable<INotificationSink> _sinks;
 
-    public NotifyCommands(IServiceScopeFactory scopeFactory, IEnumerable<INotificationSource> sources)
+    public NotifyCommands(
+        IServiceScopeFactory scopeFactory, IEnumerable<INotificationSource> sources, IEnumerable<INotificationSink> sinks)
     {
         _scopeFactory = scopeFactory;
         _sources = sources;
+        _sinks = sinks;
     }
 
     [SlashCommand("youtube", "Возвещать в канал о новых видео, Shorts и стримах YouTube-канала.")]
@@ -108,6 +112,116 @@ public sealed class NotifyCommands : ApplicationCommandModule
             "Не страшись — былые видео не будут провозглашены заново. Что за славное приключение!");
     }
 
+    [SlashCommand("twitch", "Возвещать в канал о начале трансляции на Twitch.")]
+    public async Task TwitchAsync(
+        InteractionContext ctx,
+        [Option("twitch_channel", "Логин канала Twitch или ссылка на него.")] string twitchChannel,
+        [Option("target", "Discord-канал для уведомлений.")] DiscordChannel target,
+        [Option("pin_live", "Закреплять сообщения о стримах.")] bool pinLive = false,
+        [Option("mention", "Роль для упоминания.")] DiscordRole? mention = null)
+    {
+        if (!IsTextChannel(target))
+        {
+            await ctx.ReplyAsync("Не страшись, друг мой, но сей герольд может возвещать лишь в текстовом канале!", ephemeral: true);
+            return;
+        }
+
+        var source = _sources.FirstOrDefault(s => s.SourceType == ContentSourceType.Twitch);
+        if (source is null)
+        {
+            await ctx.ReplyAsync("Увы, дорогой Санчо, герольды Twitch почивают и не могут выступить в поход (быть может, утерян ключ приложения?).", ephemeral: true);
+            return;
+        }
+
+        await ctx.DeferAsync(ephemeral: true);
+
+        (string SourceChannelId, string DisplayName)? resolved;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            resolved = await source.ResolveAsync(twitchChannel, timeout.Token);
+        }
+        catch (Exception)
+        {
+            resolved = null;
+        }
+
+        if (resolved is null)
+        {
+            await ctx.EditAsync("Увы, сие царство Twitch ускользает от моих поисков, доблестный товарищ! Проверь логин канала.");
+            return;
+        }
+
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+
+        var exists = await db.Subscriptions.AnyAsync(s =>
+            s.GuildId == ctx.Guild!.Id &&
+            s.SourceType == ContentSourceType.Twitch &&
+            s.SourceChannelId == resolved.Value.SourceChannelId &&
+            s.DiscordChannelId == target.Id);
+        if (exists)
+        {
+            await ctx.EditAsync($"Не страшись — деяния **{resolved.Value.DisplayName}** уже возвещаются в {target.Mention}!");
+            return;
+        }
+
+        db.Subscriptions.Add(new NotificationSubscription
+        {
+            GuildId = ctx.Guild!.Id,
+            SourceType = ContentSourceType.Twitch,
+            SourceChannelId = resolved.Value.SourceChannelId,
+            SourceDisplayName = resolved.Value.DisplayName,
+            DiscordChannelId = target.Id,
+            MentionRoleId = mention?.Id,
+            NotifyUploads = false,
+            NotifyShorts = false,
+            NotifyLiveStreams = true,
+            PinLiveStreams = pinLive,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        await ctx.EditAsync(
+            $"✅ Ура! Отныне я буду возвещать о трансляциях **{resolved.Value.DisplayName}** в {target.Mention}! " +
+            "Что за славное приключение!");
+    }
+
+    [SlashCommand("telegram", "Добавить или снять Telegram-цель для существующей подписки (см. /notify list).")]
+    public async Task TelegramAsync(
+        InteractionContext ctx,
+        [Option("id", "Id подписки (см. /notify list).")] long id,
+        [Option("chat_id", "Id чата Telegram (напр. -1001234567890) или @username канала. Пусто — убрать цель.")] string? chatId = null)
+    {
+        var sink = _sinks.FirstOrDefault(s => s.Name == "telegram");
+        if (sink is null)
+        {
+            await ctx.ReplyAsync("Увы, герольд Telegram почивает и не может выступить в поход (быть может, не задан токен бота?).", ephemeral: true);
+            return;
+        }
+
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+
+        var idInt = (int)id;
+        var sub = await db.Subscriptions.FirstOrDefaultAsync(s => s.Id == idInt && s.GuildId == ctx.Guild!.Id);
+        if (sub is null)
+        {
+            await ctx.ReplyAsync("Увы, ни один герольд не носит сей id в этих владениях, товарищ!", ephemeral: true);
+            return;
+        }
+
+        chatId = chatId?.Trim();
+        sub.TelegramChatId = string.IsNullOrEmpty(chatId) ? null : chatId;
+        await db.SaveChangesAsync();
+
+        await ctx.ReplyAsync(
+            sub.TelegramChatId is null
+                ? $"Герольд `#{id}` более не скачет в земли Telegram."
+                : $"✅ Герольд `#{id}` отныне скачет и в Telegram (`{sub.TelegramChatId}`)! Не забудь добавить меня в тот чат.",
+            ephemeral: true);
+    }
+
     [SlashCommand("list", "Показать подписки на уведомления на этом сервере.")]
     public async Task ListAsync(InteractionContext ctx)
     {
@@ -133,7 +247,8 @@ public sealed class NotifyCommands : ApplicationCommandModule
             if (s.NotifyShorts) kinds.Add("shorts");
             if (s.NotifyLiveStreams) kinds.Add("стримы");
 
-            sb.AppendLine($"`#{s.Id}` **{s.SourceType}** — {s.SourceDisplayName ?? s.SourceChannelId} → <#{s.DiscordChannelId}>");
+            var telegram = s.TelegramChatId is { } tg ? $" + Telegram (`{tg}`)" : "";
+            sb.AppendLine($"`#{s.Id}` **{s.SourceType}** — {s.SourceDisplayName ?? s.SourceChannelId} → <#{s.DiscordChannelId}>{telegram}");
             sb.AppendLine($"   {string.Join(", ", kinds)}{(s.PinLiveStreams ? ", 📌 закрепляет стримы" : "")}{(s.MentionRoleId is { } r ? $", упоминает <@&{r}>" : "")}");
         }
 
