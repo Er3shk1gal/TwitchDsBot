@@ -149,6 +149,7 @@ docker compose logs -f        # watch it connect
 | `/notify youtube <channel> <target> [uploads] [shorts] [liveStreams] [pinLive] [mention]` | Watch a YouTube channel (URL, `@handle`, or `UC…` id) and post to `<target>`. |
 | `/notify twitch <channel> <target> [pinLive] [mention]` | Watch a Twitch channel (login or URL) for "went live" and post to `<target>`. |
 | `/notify telegram <id> [chatId]` | Mirror subscription `<id>` (see `/notify list`) to a Telegram chat id or `@channelusername` too. Omit `chatId` to remove the Telegram target. |
+| `/notify template <id> <kind> [text]` | Override the announcement text for one event kind on subscription `<id>`. Placeholders: `{who}` `{title}` `{url}`; a configured role mention is always prepended automatically. Omit `text` to reset to the default persona text. Used by both the Discord and Telegram delivery of that subscription. |
 | `/notify list` | List this server's subscriptions (Discord + any Telegram target). |
 | `/notify remove <id>` | Remove a subscription. |
 

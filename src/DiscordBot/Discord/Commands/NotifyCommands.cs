@@ -222,6 +222,59 @@ public sealed class NotifyCommands : ApplicationCommandModule
             ephemeral: true);
     }
 
+    [SlashCommand("template", "Задать свой текст уведомления для вида события (пусто — сбросить на образец по умолчанию).")]
+    public async Task TemplateAsync(
+        InteractionContext ctx,
+        [Option("id", "Id подписки (см. /notify list).")] long id,
+        [Option("kind", "Какое событие.")] ContentEventKind kind,
+        [Option("text", "Текст. Плейсхолдеры: {who} {title} {url}. Роль-упоминание (если задана) добавляется впереди сама. Пусто — сбросить.")]
+        string? text = null)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+
+        var idInt = (int)id;
+        var subExists = await db.Subscriptions.AsNoTracking().AnyAsync(s => s.Id == idInt && s.GuildId == ctx.Guild!.Id);
+        if (!subExists)
+        {
+            await ctx.ReplyAsync("Увы, ни один герольд не носит сей id в этих владениях, товарищ!", ephemeral: true);
+            return;
+        }
+
+        text = text?.Trim();
+        var kindStr = kind.ToString();
+        var existing = await db.NotificationTemplates.FirstOrDefaultAsync(t => t.SubscriptionId == idInt && t.EventKind == kindStr);
+
+        if (string.IsNullOrEmpty(text))
+        {
+            if (existing is not null)
+            {
+                db.NotificationTemplates.Remove(existing);
+                await db.SaveChangesAsync();
+            }
+            await ctx.ReplyAsync($"Текст для `{kind}` у герольда `#{id}` сброшен на образец по умолчанию.", ephemeral: true);
+            return;
+        }
+
+        if (text.Length > 500)
+        {
+            await ctx.ReplyAsync("Не страшись, но сей текст слишком длинен (макс. 500 знаков)!", ephemeral: true);
+            return;
+        }
+
+        if (existing is not null)
+        {
+            existing.Text = text;
+        }
+        else
+        {
+            db.NotificationTemplates.Add(new NotificationTemplate { SubscriptionId = idInt, EventKind = kindStr, Text = text });
+        }
+        await db.SaveChangesAsync();
+
+        await ctx.ReplyAsync($"✅ Отныне для `{kind}` герольд `#{id}` возвещает: {text}", ephemeral: true);
+    }
+
     [SlashCommand("list", "Показать подписки на уведомления на этом сервере.")]
     public async Task ListAsync(InteractionContext ctx)
     {

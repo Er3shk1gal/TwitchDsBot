@@ -110,6 +110,25 @@ public sealed class RadioStream
     public DateTimeOffset CreatedAt { get; set; }
 }
 
+/// <summary>
+/// Optional per-subscription override of the announcement text for one
+/// <see cref="DiscordBot.Notifications.ContentEventKind"/>, set via <c>/notify template</c>. No row
+/// means the built-in persona text is used. Shared by both the Discord and Telegram sinks; supports
+/// <c>{who}</c>, <c>{title}</c>, <c>{url}</c> placeholders. A Discord role mention (if configured) is
+/// always prepended automatically and is not part of the template itself.
+/// </summary>
+public sealed class NotificationTemplate
+{
+    public int Id { get; set; }
+
+    public int SubscriptionId { get; set; }
+
+    /// <summary>Matches <see cref="ContentEventKind"/>.ToString(), same convention as <see cref="SeenContent.EventKind"/>.</summary>
+    public string EventKind { get; set; } = string.Empty;
+
+    public string Text { get; set; } = string.Empty;
+}
+
 /// <summary>Dedup record so each subscription notifies about a given item exactly once.</summary>
 public sealed class SeenContent
 {

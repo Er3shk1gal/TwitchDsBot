@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using DiscordBot.Configuration;
 using DiscordBot.Data.Entities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,13 +18,18 @@ namespace DiscordBot.Notifications.Sinks;
 public sealed class TelegramNotificationSink : INotificationSink
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly TelegramOptions _options;
     private readonly ILogger<TelegramNotificationSink> _logger;
 
     public TelegramNotificationSink(
-        IHttpClientFactory httpClientFactory, IOptions<TelegramOptions> options, ILogger<TelegramNotificationSink> logger)
+        IHttpClientFactory httpClientFactory,
+        IServiceScopeFactory scopeFactory,
+        IOptions<TelegramOptions> options,
+        ILogger<TelegramNotificationSink> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _scopeFactory = scopeFactory;
         _options = options.Value;
         _logger = logger;
     }
@@ -40,11 +46,13 @@ public sealed class TelegramNotificationSink : INotificationSink
             return; // AppliesTo already guards this; defensive only.
         }
 
+        var customTemplate = await NotificationTemplateLookup.GetAsync(_scopeFactory, subscription.Id, contentEvent.Kind, ct);
+
         var http = _httpClientFactory.CreateClient();
         var payload = new
         {
             chat_id = chatId,
-            text = BuildMessage(subscription, contentEvent),
+            text = BuildMessage(subscription, contentEvent, customTemplate),
             disable_web_page_preview = false,
         };
 
@@ -87,9 +95,15 @@ public sealed class TelegramNotificationSink : INotificationSink
         }
     }
 
-    private static string BuildMessage(NotificationSubscription subscription, ContentEvent evt)
+    private static string BuildMessage(NotificationSubscription subscription, ContentEvent evt, string? customTemplate)
     {
         var who = evt.AuthorName ?? subscription.SourceDisplayName ?? "Канал, на который вы подписаны";
+
+        if (!string.IsNullOrEmpty(customTemplate))
+        {
+            return customTemplate.Replace("{who}", who).Replace("{title}", evt.Title).Replace("{url}", evt.Url);
+        }
+
         var headline = evt.Kind switch
         {
             ContentEventKind.LiveStarted => $"🔴 Ура, друг мой! {who} мчится в прямой эфир сию же секунду — вперёд, навстречу зрелищу!",

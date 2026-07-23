@@ -142,6 +142,18 @@ using (var scope = host.Services.CreateScope())
             "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_RadioStreams_GuildId_Name\" ON \"RadioStreams\" (\"GuildId\", \"Name\")");
     }
     catch { /* table/index already exist */ }
+
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS \"NotificationTemplates\" (" +
+            "\"Id\" INTEGER NOT NULL CONSTRAINT \"PK_NotificationTemplates\" PRIMARY KEY AUTOINCREMENT, " +
+            "\"SubscriptionId\" INTEGER NOT NULL, \"EventKind\" TEXT NOT NULL, \"Text\" TEXT NOT NULL)");
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_NotificationTemplates_SubscriptionId_EventKind\" " +
+            "ON \"NotificationTemplates\" (\"SubscriptionId\", \"EventKind\")");
+    }
+    catch { /* table/index already exist */ }
 }
 
 // --- DSharpPlus v4 client (the DI singleton; command modules resolve from host.Services) ---

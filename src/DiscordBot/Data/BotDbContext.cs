@@ -14,6 +14,7 @@ public sealed class BotDbContext : DbContext
     public DbSet<GuildConfig> GuildConfigs => Set<GuildConfig>();
     public DbSet<TempVoiceChannel> TempVoiceChannels => Set<TempVoiceChannel>();
     public DbSet<NotificationSubscription> Subscriptions => Set<NotificationSubscription>();
+    public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
     public DbSet<SeenContent> SeenContent => Set<SeenContent>();
     public DbSet<RadioStream> RadioStreams => Set<RadioStream>();
 
@@ -46,6 +47,12 @@ public sealed class BotDbContext : DbContext
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.GuildId, x.SourceType, x.SourceChannelId, x.DiscordChannelId })
                 .IsUnique();
+        });
+
+        b.Entity<NotificationTemplate>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.SubscriptionId, x.EventKind }).IsUnique();
         });
 
         b.Entity<SeenContent>(e =>

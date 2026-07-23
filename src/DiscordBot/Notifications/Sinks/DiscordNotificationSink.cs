@@ -1,6 +1,7 @@
 using DiscordBot.Data.Entities;
 using DSharpPlus;
 using DSharpPlus.Entities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace DiscordBot.Notifications.Sinks;
@@ -12,11 +13,13 @@ namespace DiscordBot.Notifications.Sinks;
 public sealed class DiscordNotificationSink : INotificationSink
 {
     private readonly DiscordClient _client;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<DiscordNotificationSink> _logger;
 
-    public DiscordNotificationSink(DiscordClient client, ILogger<DiscordNotificationSink> logger)
+    public DiscordNotificationSink(DiscordClient client, IServiceScopeFactory scopeFactory, ILogger<DiscordNotificationSink> logger)
     {
         _client = client;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -31,14 +34,26 @@ public sealed class DiscordNotificationSink : INotificationSink
         // Let channel-lookup and send failures propagate: the dispatcher only marks an event "seen"
         // when delivery succeeds, so a transient error here is retried next cycle rather than lost.
         var channel = await _client.GetChannelAsync(subscription.DiscordChannelId);
+        var customTemplate = await NotificationTemplateLookup.GetAsync(_scopeFactory, subscription.Id, contentEvent.Kind, ct);
+
+        // The @everyone role's id equals the guild's id. Its DisplayName in Discord's data model is
+        // literally the string "@everyone" (unlike a normal role, whose Name has no "@") — so the
+        // client's usual "@" + role-name pill rendering for <@&id> doubles up to "@@everyone" for this
+        // one role. Mention it with the literal plain-text token instead, which is what Discord expects.
+        var isEveryone = subscription.MentionRoleId == subscription.GuildId;
+        var mentionPrefix = subscription.MentionRoleId is { } roleId
+            ? (isEveryone ? "@everyone " : $"<@&{roleId}> ")
+            : string.Empty;
 
         var builder = new DiscordMessageBuilder()
-            .WithContent(BuildContent(subscription, contentEvent))
+            .WithContent(BuildContent(mentionPrefix, subscription, contentEvent, customTemplate))
             .AddEmbed(BuildEmbed(contentEvent));
 
-        if (subscription.MentionRoleId is { } roleId)
+        if (subscription.MentionRoleId is { } mentionRoleId)
         {
-            builder.WithAllowedMentions(new IMention[] { new RoleMention(roleId) });
+            builder.WithAllowedMentions(isEveryone
+                ? new IMention[] { EveryoneMention.All }
+                : new IMention[] { new RoleMention(mentionRoleId) });
         }
 
         var message = await channel.SendMessageAsync(builder);
@@ -58,19 +73,25 @@ public sealed class DiscordNotificationSink : INotificationSink
         }
     }
 
-    private static string BuildContent(NotificationSubscription subscription, ContentEvent evt)
+    private static string BuildContent(
+        string mentionPrefix, NotificationSubscription subscription, ContentEvent evt, string? customTemplate)
     {
-        var mention = subscription.MentionRoleId is { } roleId ? $"<@&{roleId}> " : string.Empty;
         var who = evt.AuthorName ?? subscription.SourceDisplayName ?? "A channel you follow";
 
-        return evt.Kind switch
-        {
-            ContentEventKind.LiveStarted => $"{mention}🔴 Ура, друг мой! **{who}** мчится в прямой эфир сию же секунду — вперёд, навстречу зрелищу!",
-            ContentEventKind.LiveScheduled => $"{mention}📅 Внемли, доблестный товарищ! **{who}** возвестил о грядущей трансляции — нас ждёт новый квест!",
-            ContentEventKind.ShortUploaded => $"{mention}🎬 Эхехе~ **{who}** являет доблестный новый Short — что за славное приключение!",
-            _ => $"{mention}📺 Не страшись, дорогой Санчо! **{who}** герольдом возвещает славное новое видео — вперёд, смотреть!",
-        };
+        var body = string.IsNullOrEmpty(customTemplate)
+            ? DefaultBody(evt.Kind, who)
+            : customTemplate.Replace("{who}", who).Replace("{title}", evt.Title).Replace("{url}", evt.Url);
+
+        return mentionPrefix + body;
     }
+
+    private static string DefaultBody(ContentEventKind kind, string who) => kind switch
+    {
+        ContentEventKind.LiveStarted => $"🔴 Ура, друг мой! **{who}** мчится в прямой эфир сию же секунду — вперёд, навстречу зрелищу!",
+        ContentEventKind.LiveScheduled => $"📅 Внемли, доблестный товарищ! **{who}** возвестил о грядущей трансляции — нас ждёт новый квест!",
+        ContentEventKind.ShortUploaded => $"🎬 Эхехе~ **{who}** являет доблестный новый Short — что за славное приключение!",
+        _ => $"📺 Не страшись, дорогой Санчо! **{who}** герольдом возвещает славное новое видео — вперёд, смотреть!",
+    };
 
     private static DiscordEmbed BuildEmbed(ContentEvent evt)
     {
